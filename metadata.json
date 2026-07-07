@@ -1,0 +1,6 @@
+{
+  "name": "VIUX",
+  "description": "PWA de VIUX para reservar y gestionar el alquiler de monopatines eléctricos en Pinamar con control de turnos en tiempo real, panel admin y caja del día.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

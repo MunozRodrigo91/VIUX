@@ -1,0 +1,308 @@
+{
+  "config": {
+    "precioPorHora": 8000,
+    "montoGarantia": 10000,
+    "porcentajeSeña": 30,
+    "toleranciaNoShowMinutos": 15,
+    "capacidadMaximaScooters": 4
+  },
+  "turnos": [
+    {
+      "id": "2026-07-06_0900",
+      "fecha": "2026-07-06",
+      "hora": "09:00",
+      "total_unidades": 4,
+      "unidades_disponibles": 2
+    },
+    {
+      "id": "2026-07-06_1000",
+      "fecha": "2026-07-06",
+      "hora": "10:00",
+      "total_unidades": 4,
+      "unidades_disponibles": 4
+    },
+    {
+      "id": "2026-07-06_1100",
+      "fecha": "2026-07-06",
+      "hora": "11:00",
+      "total_unidades": 4,
+      "unidades_disponibles": 3
+    },
+    {
+      "id": "2026-07-06_1200",
+      "fecha": "2026-07-06",
+      "hora": "12:00",
+      "total_unidades": 4,
+      "unidades_disponibles": 4
+    },
+    {
+      "id": "2026-07-06_1300",
+      "fecha": "2026-07-06",
+      "hora": "13:00",
+      "total_unidades": 4,
+      "unidades_disponibles": 4
+    },
+    {
+      "id": "2026-07-06_1400",
+      "fecha": "2026-07-06",
+      "hora": "14:00",
+      "total_unidades": 4,
+      "unidades_disponibles": 4
+    },
+    {
+      "id": "2026-07-06_1500",
+      "fecha": "2026-07-06",
+      "hora": "15:00",
+      "total_unidades": 4,
+      "unidades_disponibles": 4
+    },
+    {
+      "id": "2026-07-06_1600",
+      "fecha": "2026-07-06",
+      "hora": "16:00",
+      "total_unidades": 4,
+      "unidades_disponibles": 4
+    },
+    {
+      "id": "2026-07-06_1700",
+      "fecha": "2026-07-06",
+      "hora": "17:00",
+      "total_unidades": 4,
+      "unidades_disponibles": 2
+    },
+    {
+      "id": "2026-07-06_1800",
+      "fecha": "2026-07-06",
+      "hora": "18:00",
+      "total_unidades": 4,
+      "unidades_disponibles": 4
+    },
+    {
+      "id": "2026-07-06_1900",
+      "fecha": "2026-07-06",
+      "hora": "19:00",
+      "total_unidades": 4,
+      "unidades_disponibles": 4
+    },
+    {
+      "id": "2026-07-07_0900",
+      "fecha": "2026-07-07",
+      "hora": "09:00",
+      "total_unidades": 4,
+      "unidades_disponibles": 4
+    },
+    {
+      "id": "2026-07-07_1000",
+      "fecha": "2026-07-07",
+      "hora": "10:00",
+      "total_unidades": 4,
+      "unidades_disponibles": 4
+    },
+    {
+      "id": "2026-07-07_1100",
+      "fecha": "2026-07-07",
+      "hora": "11:00",
+      "total_unidades": 4,
+      "unidades_disponibles": 4
+    },
+    {
+      "id": "2026-07-07_1200",
+      "fecha": "2026-07-07",
+      "hora": "12:00",
+      "total_unidades": 4,
+      "unidades_disponibles": 4
+    },
+    {
+      "id": "2026-07-07_1300",
+      "fecha": "2026-07-07",
+      "hora": "13:00",
+      "total_unidades": 4,
+      "unidades_disponibles": 4
+    },
+    {
+      "id": "2026-07-07_1400",
+      "fecha": "2026-07-07",
+      "hora": "14:00",
+      "total_unidades": 4,
+      "unidades_disponibles": 4
+    },
+    {
+      "id": "2026-07-07_1500",
+      "fecha": "2026-07-07",
+      "hora": "15:00",
+      "total_unidades": 4,
+      "unidades_disponibles": 4
+    },
+    {
+      "id": "2026-07-07_1600",
+      "fecha": "2026-07-07",
+      "hora": "16:00",
+      "total_unidades": 4,
+      "unidades_disponibles": 4
+    },
+    {
+      "id": "2026-07-07_1700",
+      "fecha": "2026-07-07",
+      "hora": "17:00",
+      "total_unidades": 4,
+      "unidades_disponibles": 4
+    },
+    {
+      "id": "2026-07-07_1800",
+      "fecha": "2026-07-07",
+      "hora": "18:00",
+      "total_unidades": 4,
+      "unidades_disponibles": 4
+    },
+    {
+      "id": "2026-07-07_1900",
+      "fecha": "2026-07-07",
+      "hora": "19:00",
+      "total_unidades": 4,
+      "unidades_disponibles": 4
+    }
+  ],
+  "reservas": [
+    {
+      "id": "res_1001",
+      "turno_id": "2026-07-06_0900",
+      "fecha_turno": "2026-07-06",
+      "hora_turno": "09:00",
+      "nombre_cliente": "Martín Gómez",
+      "dni_cliente": "38491823",
+      "telefono_cliente": "+54 9 2254 41-2345",
+      "email_cliente": "martin.gomez@gmail.com",
+      "cantidad_monopatines": 2,
+      "monto_total": 16000,
+      "monto_seña": 4800,
+      "monto_saldo": 11200,
+      "monto_garantia": 20000,
+      "estado_pago": "seña_pagada",
+      "estado_reserva": "check_out",
+      "partner": "Hotel del Bosque",
+      "mp_preference_id": "pref_mp_101",
+      "created_at": "2026-07-06T13:47:09.172Z"
+    },
+    {
+      "id": "res_1002",
+      "turno_id": "2026-07-06_1100",
+      "fecha_turno": "2026-07-06",
+      "hora_turno": "11:00",
+      "nombre_cliente": "Sofía Rodríguez",
+      "dni_cliente": "41029481",
+      "telefono_cliente": "+54 9 11 5501-9982",
+      "email_cliente": "sofia.rod@gmail.com",
+      "cantidad_monopatines": 1,
+      "monto_total": 8000,
+      "monto_seña": 2400,
+      "monto_saldo": 5600,
+      "monto_garantia": 10000,
+      "estado_pago": "seña_pagada",
+      "estado_reserva": "check_in",
+      "partner": "Hotel Playas",
+      "mp_preference_id": "pref_mp_102",
+      "created_at": "2026-07-06T15:47:09.173Z"
+    },
+    {
+      "id": "res_1003",
+      "turno_id": "2026-07-06_1700",
+      "fecha_turno": "2026-07-06",
+      "hora_turno": "17:00",
+      "nombre_cliente": "Alejandro Pérez",
+      "dni_cliente": "35912482",
+      "telefono_cliente": "+54 9 2267 52-9481",
+      "email_cliente": "perez.ale@outlook.com",
+      "cantidad_monopatines": 2,
+      "monto_total": 16000,
+      "monto_seña": 4800,
+      "monto_saldo": 11200,
+      "monto_garantia": 20000,
+      "estado_pago": "seña_pagada",
+      "estado_reserva": "creada",
+      "partner": "Hotel del Bosque",
+      "mp_preference_id": "pref_mp_103",
+      "created_at": "2026-07-06T17:47:09.173Z"
+    }
+  ],
+  "caja": {
+    "2026-07-06": {
+      "fecha": "2026-07-06",
+      "monto_apertura": 15000,
+      "estado": "abierta",
+      "transacciones": [
+        {
+          "id": "tx_01",
+          "tipo": "apertura",
+          "monto": 15000,
+          "descripcion": "Apertura de caja inicial",
+          "created_at": "2026-07-06T08:00:00.173Z"
+        },
+        {
+          "id": "tx_02",
+          "tipo": "ingreso_seña_mp",
+          "monto": 4800,
+          "descripcion": "Seña Online MP - Reserva Martín Gómez (res_1001)",
+          "reserva_id": "res_1001",
+          "created_at": "2026-07-06T08:15:00.173Z"
+        },
+        {
+          "id": "tx_03",
+          "tipo": "ingreso_seña_mp",
+          "monto": 2400,
+          "descripcion": "Seña Online MP - Reserva Sofía Rodríguez (res_1002)",
+          "reserva_id": "res_1002",
+          "created_at": "2026-07-06T09:10:00.173Z"
+        },
+        {
+          "id": "tx_04",
+          "tipo": "ingreso_seña_mp",
+          "monto": 4800,
+          "descripcion": "Seña Online MP - Reserva Alejandro Pérez (res_1003)",
+          "reserva_id": "res_1003",
+          "created_at": "2026-07-06T10:00:00.173Z"
+        },
+        {
+          "id": "tx_05",
+          "tipo": "ingreso_saldo_efectivo",
+          "monto": 11200,
+          "descripcion": "Cobro Saldo Efectivo - Reserva Martín Gómez (res_1001)",
+          "reserva_id": "res_1001",
+          "created_at": "2026-07-06T09:05:00.173Z"
+        },
+        {
+          "id": "tx_06",
+          "tipo": "ingreso_garantia_efectivo",
+          "monto": 20000,
+          "descripcion": "Garantía Efectivo - Reserva Martín Gómez (res_1001)",
+          "reserva_id": "res_1001",
+          "created_at": "2026-07-06T09:06:00.173Z"
+        },
+        {
+          "id": "tx_07",
+          "tipo": "egreso_garantia_efectivo",
+          "monto": 20000,
+          "descripcion": "Devolución Garantía - Reserva Martín Gómez (res_1001)",
+          "reserva_id": "res_1001",
+          "created_at": "2026-07-06T10:15:00.173Z"
+        },
+        {
+          "id": "tx_08",
+          "tipo": "ingreso_saldo_efectivo",
+          "monto": 5600,
+          "descripcion": "Cobro Saldo Efectivo - Reserva Sofía Rodríguez (res_1002)",
+          "reserva_id": "res_1002",
+          "created_at": "2026-07-06T11:05:00.173Z"
+        },
+        {
+          "id": "tx_09",
+          "tipo": "ingreso_garantia_efectivo",
+          "monto": 10000,
+          "descripcion": "Garantía Efectivo - Reserva Sofía Rodríguez (res_1002)",
+          "reserva_id": "res_1002",
+          "created_at": "2026-07-06T11:06:00.173Z"
+        }
+      ],
+      "total_efectivo_actual": 41800
+    }
+  }
+}
