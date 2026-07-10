@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Turno, Reserva, Config } from "../types";
 import { Calendar as CalendarIcon, Users, User, Phone, Shield, ArrowRight, ArrowLeft, RefreshCw, AlertTriangle, CreditCard, Sparkles, Mail } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { supabase } from "../lib/supabase";
 
 interface PublicBookingProps {
   partner?: string;
@@ -69,10 +70,16 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
   const fetchTurnos = async (showLoading = true) => {
     if (showLoading) setLoadingTurnos(true);
     try {
-      const res = await fetch(`/api/turnos?fecha=${fecha}`);
-      if (res.ok) {
-        const data = await res.json();
-        setTurnos(data);
+      // Cargar turnos usando Supabase
+      const { data, error } = await supabase
+        .from("turnos")
+        .select("*")
+        .eq("fecha", fecha)
+        .order("hora", { ascending: true });
+
+      if (!error && data) {
+        // Mapear los datos de Supabase si es necesario, aunque coinciden en estructura
+        setTurnos(data as unknown as Turno[]);
       }
     } catch (e) {
       console.error("Error fetching turnos", e);
@@ -108,34 +115,61 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
     setBookingError("");
 
     try {
-      const res = await fetch("/api/reservas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      // 1. Generar ID único para la reserva
+      const resId = `res_${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+      // 2. Obtener los detalles del turno seleccionado para completar fecha y hora
+      const selectedTurno = turnos.find(t => t.id === selectedTurnoId);
+      if (!selectedTurno) {
+        setBookingError("Turno inválido o no seleccionado.");
+        setLoadingBooking(false);
+        return;
+      }
+
+      // 3. Invocar a la Edge Function 'validate-booking' en Supabase para crear la reserva y bloquear stock de forma segura
+      const { data: edgeData, error: edgeError } = await supabase.functions.invoke('validate-booking', {
+        body: {
           turno_id: selectedTurnoId,
+          cantidad: cantidad,
           nombre_cliente: nombre,
           dni_cliente: dni,
           telefono_cliente: telefono,
           email_cliente: email,
-          cantidad_monopatines: cantidad,
-          partner: partner || null,
+          monto_total: totalAlquiler,
+          monto_sena: montoSeña,
+          monto_saldo: montoSaldo,
+          monto_garantia: montoGarantia,
           delivery_mode: deliveryMode,
-          nombre_hotel: deliveryMode === "hotel_delivery" ? nombreHotel : undefined,
-          punto_encuentro_zona: deliveryMode === "meeting_point" ? puntoEncuentroZona : undefined,
-        }),
+          nombre_hotel: deliveryMode === "hotel_delivery" ? nombreHotel : null,
+          punto_encuentro_zona: deliveryMode === "meeting_point" ? puntoEncuentroZona : null,
+          partner: partner || null,
+          source: "PWA-Local"
+        }
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setCreatedReserva(data.reserva);
-        setMpCheckoutUrl(data.checkout_url);
-        setStep(4);
-      } else {
-        const err = await res.json();
-        setBookingError(err.error || "Hubo un problema al procesar tu reserva.");
+      if (edgeError || (edgeData && !edgeData.success)) {
+        throw new Error(edgeError?.message || edgeData?.error || "Error al validar la disponibilidad o crear la reserva.");
       }
-    } catch (e) {
-      setBookingError("Error de conexión. Intentá de nuevo.");
+
+      const createdId = edgeData.reserva_id;
+
+      // 4. Traer la reserva creada para mostrarla en el paso del ticket / simulador de pago
+      const { data: dbReserva, error: getResError } = await supabase
+        .from('reservas')
+        .select('*')
+        .eq('id', createdId)
+        .single();
+
+      if (getResError || !dbReserva) {
+        throw new Error("No se pudo obtener la información de la reserva creada.");
+      }
+
+      setCreatedReserva(dbReserva as unknown as Reserva);
+      setMpCheckoutUrl(`https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=pref_${createdId}`);
+      setStep(4);
+    } catch (e: any) {
+      console.error(e);
+      setBookingError(e.message || "Hubo un problema al procesar tu reserva.");
     } finally {
       setLoadingBooking(false);
     }
@@ -145,25 +179,51 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
     if (!createdReserva) return;
     setLoadingBooking(true);
     try {
-      const res = await fetch("/api/mercadopago/webhook", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          reserva_id: createdReserva.id,
-          preference_id: createdReserva.mp_preference_id || "",
-          status: "approved"
-        })
-      });
-      if (res.ok) {
-        const updatedRes = await fetch(`/api/reservas/${createdReserva.id}`);
-        if (updatedRes.ok) {
-          const finalRes = await updatedRes.json();
-          onBookingSuccess(finalRes);
-        }
+      // 1. Confirmar pago de la seña en la reserva
+      const { error: updateError } = await supabase
+        .from('reservas')
+        .update({ estado_pago: 'seña_pagada' })
+        .eq('id', createdReserva.id);
+
+      if (updateError) throw new Error(updateError.message);
+
+      // 2. Intentar buscar si hay una caja abierta para hoy para registrar la transacción digital
+      const today = new Date().toISOString().split("T")[0];
+      const { data: cajaData } = await supabase
+        .from('cajas')
+        .select('*')
+        .eq('fecha', today)
+        .eq('estado', 'abierta')
+        .single();
+
+      if (cajaData) {
+        // Si hay una caja abierta, registrar la transacción contable digital de seña MP
+        const txId = Math.floor(Math.random() * 100000000);
+        await supabase
+          .from('transacciones')
+          .insert({
+            id: txId,
+            caja_id: cajaData.id,
+            reserva_id: createdReserva.id,
+            tipo: 'ingreso_seña_mp',
+            monto: createdReserva.monto_seña,
+            descripcion: `Ingreso Seña MP - ${createdReserva.nombre_cliente} (${createdReserva.id})`
+          });
       }
-    } catch (e) {
+
+      // 3. Traer la reserva actualizada
+      const { data: finalRes, error: fetchError } = await supabase
+        .from('reservas')
+        .select('*')
+        .eq('id', createdReserva.id)
+        .single();
+
+      if (!fetchError && finalRes) {
+        onBookingSuccess(finalRes as unknown as Reserva);
+      }
+    } catch (e: any) {
       console.error(e);
-      setBookingError("Error simulando el pago instantáneo");
+      setBookingError("Error simulando el pago instantáneo: " + e.message);
     } finally {
       setLoadingBooking(false);
     }

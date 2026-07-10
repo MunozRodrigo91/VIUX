@@ -7,6 +7,7 @@ import AdminPanel from "./components/AdminPanel";
 import LandingPage from "./components/LandingPage";
 import { Sparkles, Compass, ShieldAlert, AlertTriangle, Key, User, ArrowRight, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { supabase } from "./lib/supabase";
 
 export default function App() {
   const [view, setView] = useState<"public" | "admin">("public");
@@ -28,32 +29,77 @@ export default function App() {
   const [notification, setNotification] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   // Admin Authentication State
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return sessionStorage.getItem("admin_auth") === "true";
-    }
-    return false;
-  });
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(false);
   const [loginUser, setLoginUser] = useState<string>("");
   const [loginPassword, setLoginPassword] = useState<string>("");
   const [loginError, setLoginError] = useState<string>("");
+  const [loggingIn, setLoggingIn] = useState<boolean>(false);
+
+  // Helper para verificar rol de admin
+  const checkIfAdmin = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single();
+      
+      if (!error && data?.role === 'admin') {
+        setIsAdminAuthenticated(true);
+      } else {
+        setIsAdminAuthenticated(false);
+        await supabase.auth.signOut();
+        setLoginError("Acceso denegado: No tenés permisos de administrador.");
+      }
+    } catch (err) {
+      setIsAdminAuthenticated(false);
+    }
+  };
 
   useEffect(() => {
-    // 1. Fetch backend config
-    fetch("/api/config")
-      .then((res) => {
-        if (res.ok) return res.json();
-        throw new Error();
-      })
-      .then((data) => {
-        setConfig(data);
-        setLoadingConfig(false);
-      })
-      .catch(() => {
-        setLoadingConfig(false);
-      });
+    // 1. Fetch Supabase Config
+    const fetchConfig = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('config')
+          .select('*')
+          .eq('id', 1)
+          .single();
 
-    // 2. Parse query parameters
+        if (!error && data) {
+          setConfig({
+            precioPorHora: data.precio_por_hora,
+            montoGarantia: data.monto_garantia,
+            porcentajeSeña: data.porcentaje_sena,
+            toleranciaNoShowMinutos: data.tolerancia_no_show_minutos,
+            capacidadMaximaScooters: data.capacidad_maxima_scooters
+          });
+        }
+      } catch (err) {
+        console.error("Error cargando la configuración de Supabase:", err);
+      } finally {
+        setLoadingConfig(false);
+      }
+    };
+
+    fetchConfig();
+
+    // 2. Comprobar sesión de Supabase Auth
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        checkIfAdmin(session.user.id);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        checkIfAdmin(session.user.id);
+      } else {
+        setIsAdminAuthenticated(false);
+      }
+    });
+
+    // 3. Parse query parameters
     const params = new URLSearchParams(window.location.search);
     const partnerParam = params.get("partner");
     if (partnerParam) {
@@ -62,27 +108,33 @@ export default function App() {
 
     const confirmedId = params.get("reserva_confirmada");
     if (confirmedId) {
-      // Fetch the newly confirmed reservation from backend
-      fetch(`/api/reservas/${confirmedId}`)
-        .then((res) => {
-          if (res.ok) return res.json();
-          throw new Error();
-        })
-        .then((reservaData) => {
-          setCurrentReserva(reservaData);
-          setCurrentStep(5); // Render step 5 ticket
-          setStartedBooking(true); // Bypass landing
-          setNotification({
-            message: `¡Seña de $${reservaData.monto_seña.toLocaleString("es-AR")} cobrada con éxito! Tu reserva está activa.`,
-            type: "success"
-          });
-        })
-        .catch(() => {
+      const fetchConfirmedReserva = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('reservas')
+            .select('*')
+            .eq('id', confirmedId)
+            .single();
+
+          if (!error && data) {
+            setCurrentReserva(data as unknown as Reserva);
+            setCurrentStep(5); // Render step 5 ticket
+            setStartedBooking(true); // Bypass landing
+            setNotification({
+              message: `¡Seña de $${data.monto_seña.toLocaleString("es-AR")} cobrada con éxito! Tu reserva está activa.`,
+              type: "success"
+            });
+          } else {
+            throw new Error();
+          }
+        } catch (err) {
           setNotification({
             message: "No se pudo cargar el ticket de reserva.",
             type: "error"
           });
-        });
+        }
+      };
+      fetchConfirmedReserva();
     }
 
     const failedId = params.get("reserva_fallida");
@@ -93,21 +145,28 @@ export default function App() {
       });
     }
 
-    // SSE for configuration changes
-    const eventSource = new EventSource("/api/realtime");
-    eventSource.onmessage = (event) => {
-      try {
-        const parsed = JSON.parse(event.data);
-        if (parsed.type === "config_updated") {
-          setConfig(parsed.data);
+    // 4. Supabase Realtime Subscription for Config updates
+    const configChannel = supabase
+      .channel('config-updates')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'config', filter: 'id=eq.1' },
+        (payload) => {
+          const data = payload.new as any;
+          setConfig({
+            precioPorHora: data.precio_por_hora,
+            montoGarantia: data.monto_garantia,
+            porcentajeSeña: data.porcentaje_sena,
+            toleranciaNoShowMinutos: data.tolerancia_no_show_minutos,
+            capacidadMaximaScooters: data.capacidad_maxima_scooters
+          });
         }
-      } catch (e) {
-        console.error(e);
-      }
-    };
+      )
+      .subscribe();
 
     return () => {
-      eventSource.close();
+      subscription.unsubscribe();
+      supabase.removeChannel(configChannel);
     };
   }, []);
 
@@ -127,30 +186,41 @@ export default function App() {
     window.history.pushState({}, document.title, window.location.pathname + (partner ? `?partner=${partner}` : ""));
   };
 
-  const handleAdminLogin = (e: React.FormEvent) => {
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
+    setLoggingIn(true);
 
-    // Validate using Mock Data
-    if (loginUser.trim().toLowerCase() === "admin" && loginPassword === "admin") {
-      setIsAdminAuthenticated(true);
-      sessionStorage.setItem("admin_auth", "true");
-      setLoginUser("");
-      setLoginPassword("");
-    } else {
-      setLoginError("Usuario o contraseña incorrectos. Intentá nuevamente.");
+    try {
+      // Iniciar sesión con Supabase Auth.
+      // Como solo manejamos un admin, se puede loguear con su correo de Supabase.
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: loginUser.includes('@') ? loginUser : `${loginUser}@viux.com`,
+        password: loginPassword,
+      });
+
+      if (error) {
+        setLoginError("Usuario o contraseña incorrectos en Supabase. Intentá nuevamente.");
+      } else if (data.user) {
+        await checkIfAdmin(data.user.id);
+      }
+    } catch (err) {
+      setLoginError("Error de conexión con el servicio de autenticación.");
+    } finally {
+      setLoggingIn(false);
     }
   };
 
-  const handleAdminLogout = () => {
+  const handleAdminLogout = async () => {
+    await supabase.auth.signOut();
     setIsAdminAuthenticated(false);
-    sessionStorage.removeItem("admin_auth");
     setView("public");
     setNotification({
       message: "Sesión de administración cerrada correctamente.",
       type: "success"
     });
   };
+
 
   return (
     <div className="min-h-screen flex flex-col font-sans antialiased text-white selection:bg-[#FF5500] selection:text-white bg-[#0A0A0C] relative">

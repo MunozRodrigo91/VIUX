@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Turno, Reserva, Caja, Transaccion, PartnerStats, Config } from "../types";
 import { Calendar, Users, DollarSign, ArrowUpRight, ArrowDownRight, UserCheck, Check, Trash, Plus, ShieldAlert, Sparkles, RefreshCw, BarChart2, Briefcase, FileText, LogOut, TrendingUp, Download, PieChart, Activity, MapPin, Building, Clock } from "lucide-react";
+import { supabase } from "../lib/supabase";
 
 interface AdminPanelProps {
   config: Config;
@@ -41,25 +42,38 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
   useEffect(() => {
     fetchData();
 
-    // Setup SSE connection for real-time updates
-    const eventSource = new EventSource("/api/realtime");
-    
-    eventSource.onmessage = (event) => {
-      try {
-        const parsed = JSON.parse(event.data);
-        if (parsed.type === "turnos_updated" || parsed.type === "reserva_creada" || parsed.type === "pago_confirmado" || parsed.type === "reserva_updated" || parsed.type === "caja_updated") {
-          fetchData(false); // Silent reload
+    // Configurar suscripción Supabase Realtime en multicanal
+    const realtimeChannel = supabase
+      .channel('admin-db-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reservas' },
+        () => {
+          fetchData(false);
           if (activeTab === "analytics") {
             fetchAllReservas();
           }
         }
-      } catch (e) {
-        console.error("SSE parsing error", e);
-      }
-    };
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'turnos' },
+        () => fetchData(false)
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'cajas' },
+        () => fetchData(false)
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'transacciones' },
+        () => fetchData(false)
+      )
+      .subscribe();
 
     return () => {
-      eventSource.close();
+      supabase.removeChannel(realtimeChannel);
     };
   }, [selectedFecha, activeTab]);
 
@@ -72,10 +86,12 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
   const fetchAllReservas = async () => {
     setLoadingAnalytics(true);
     try {
-      const res = await fetch("/api/reservas");
-      if (res.ok) {
-        const data = await res.json();
-        setAllReservas(data);
+      const { data, error } = await supabase
+        .from('reservas')
+        .select('*');
+
+      if (!error && data) {
+        setAllReservas(data as unknown as Reserva[]);
       }
     } catch (e) {
       console.error(e);
@@ -87,28 +103,61 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
   const fetchData = async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
-      const resBookings = await fetch(`/api/reservas?fecha=${selectedFecha}`);
-      if (resBookings.ok) {
-        const bookings = await resBookings.json();
-        setReservas(bookings);
+      // 1. Obtener Reservas de la fecha
+      const { data: bookings, error: bookingsErr } = await supabase
+        .from('reservas')
+        .select('*')
+        .eq('fecha_turno', selectedFecha);
+
+      if (!bookingsErr && bookings) {
+        setReservas(bookings as unknown as Reserva[]);
       }
 
-      const resTurnos = await fetch(`/api/turnos?fecha=${selectedFecha}`);
-      if (resTurnos.ok) {
-        const shifts = await resTurnos.json();
-        setTurnos(shifts);
+      // 2. Obtener Turnos de la fecha
+      const { data: shifts, error: shiftsErr } = await supabase
+        .from('turnos')
+        .select('*')
+        .eq('fecha', selectedFecha)
+        .order('hora', { ascending: true });
+
+      if (!shiftsErr && shifts) {
+        setTurnos(shifts as unknown as Turno[]);
       }
 
-      const resCaja = await fetch(`/api/caja?fecha=${selectedFecha}`);
-      if (resCaja.ok) {
-        const dataCaja = await resCaja.json();
-        setCaja(dataCaja.estado === "cerrada" && dataCaja.transacciones.length === 0 ? null : dataCaja);
+      // 3. Obtener Caja del día (incluyendo sus transacciones relacionadas)
+      const { data: cajaData, error: cajaErr } = await supabase
+        .from('cajas')
+        .select('*, transacciones(*)')
+        .eq('fecha', selectedFecha)
+        .maybeSingle();
+
+      if (!cajaErr && cajaData) {
+        setCaja(cajaData as unknown as Caja);
+      } else {
+        setCaja(null);
       }
 
-      const resPartners = await fetch("/api/partners");
-      if (resPartners.ok) {
-        const partners = await resPartners.json();
-        setPartnerStats(partners);
+      // 4. Calcular estadísticas de partners basadas en todas las reservas
+      if (allReservas.length > 0) {
+        const statsMap: { [key: string]: { count: number, total: number } } = {};
+        allReservas.forEach(r => {
+          if (r.partner) {
+            if (!statsMap[r.partner]) statsMap[r.partner] = { count: 0, total: 0 };
+            statsMap[r.partner].count += 1;
+            if (r.estado_pago === 'seña_pagada') {
+              statsMap[r.partner].total += r.monto_seña;
+            }
+            if (r.estado_reserva === 'check_in' || r.estado_reserva === 'check_out') {
+              statsMap[r.partner].total += r.monto_saldo;
+            }
+          }
+        });
+        const stats = Object.entries(statsMap).map(([pName, pVal]) => ({
+          partner: pName,
+          reservas_count: pVal.count,
+          total_recaudado: pVal.total
+        }));
+        setPartnerStats(stats);
       }
     } catch (e) {
       console.error(e);
@@ -119,14 +168,12 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
 
   const handleUpdateTurnoCapacity = async (turnoId: string, capacity: number) => {
     try {
-      const res = await fetch("/api/turnos/set-capacity", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: turnoId, total_unidades: capacity }),
-      });
-      if (res.ok) {
-        fetchData(false);
-      }
+      await supabase
+        .from('turnos')
+        .update({ total_unidades: capacity, unidades_disponibles: capacity })
+        .eq('id', turnoId);
+      
+      fetchData(false);
     } catch (e) {
       console.error(e);
     }
@@ -135,48 +182,174 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
   const handleCheckIn = async (reservaId: string) => {
     const dniVal = checkInDni[reservaId] || "";
     try {
-      const res = await fetch(`/api/reservas/${reservaId}/check-in`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dni_cliente: dniVal })
-      });
-      if (res.ok) {
-        fetchData(false);
-      } else {
-        const err = await res.json();
-        alert(err.error || "No se pudo realizar el check-in");
+      // 1. Obtener la reserva actual
+      const { data: reserva, error: resError } = await supabase
+        .from('reservas')
+        .select('*')
+        .eq('id', reservaId)
+        .single();
+
+      if (resError || !reserva) {
+        alert("No se pudo obtener la información de la reserva.");
+        return;
       }
-    } catch (e) {
+
+      // 2. Buscar la caja diaria abierta de la fecha
+      const { data: activeCaja, error: cajaError } = await supabase
+        .from('cajas')
+        .select('*')
+        .eq('fecha', selectedFecha)
+        .eq('estado', 'abierta')
+        .single();
+
+      if (cajaError || !activeCaja) {
+        alert("Error: Se requiere que la caja diaria esté ABIERTA para poder realizar el Check-in.");
+        return;
+      }
+
+      // 3. Cambiar estado de reserva a check_in
+      const { error: updateResError } = await supabase
+        .from('reservas')
+        .update({ 
+          estado_reserva: 'check_in',
+          dni_cliente: dniVal || reserva.dni_cliente
+        })
+        .eq('id', reservaId);
+
+      if (updateResError) throw new Error(updateResError.message);
+
+      // 4. Registrar transacciones contables
+      const txSaldoId = Math.floor(Math.random() * 100000000);
+      const txGarantiaId = Math.floor(Math.random() * 100000001);
+
+      await supabase
+        .from('transacciones')
+        .insert([
+          {
+            id: txSaldoId,
+            caja_id: activeCaja.id,
+            reserva_id: reservaId,
+            tipo: 'ingreso_saldo_efectivo',
+            monto: reserva.monto_saldo,
+            descripcion: `Saldo presencial en efectivo - ${reserva.nombre_cliente} (${reservaId})`
+          },
+          {
+            id: txGarantiaId,
+            caja_id: activeCaja.id,
+            reserva_id: reservaId,
+            tipo: 'ingreso_garantia_efectivo',
+            monto: reserva.monto_garantia,
+            descripcion: `Garantía en efectivo - ${reserva.nombre_cliente} (${reservaId})`
+          }
+        ]);
+
+      // 5. Afectar saldo en efectivo actual de la caja
+      const nuevoEfectivo = activeCaja.total_efectivo_actual + reserva.monto_saldo + reserva.monto_garantia;
+      await supabase
+        .from('cajas')
+        .update({ total_efectivo_actual: nuevoEfectivo })
+        .eq('id', activeCaja.id);
+
+      fetchData(false);
+    } catch (e: any) {
       console.error(e);
+      alert("Error al realizar check-in: " + e.message);
     }
   };
 
   const handleCheckOut = async (reservaId: string) => {
     if (!confirm("¿Confirmás la devolución del monopatín en buen estado y la devolución de la garantía?")) return;
     try {
-      const res = await fetch(`/api/reservas/${reservaId}/check-out`, {
-        method: "POST"
-      });
-      if (res.ok) {
-        fetchData(false);
-      } else {
-        const err = await res.json();
-        alert(err.error || "No se pudo realizar el check-out");
+      const { data: reserva, error: resError } = await supabase
+        .from('reservas')
+        .select('*')
+        .eq('id', reservaId)
+        .single();
+
+      if (resError || !reserva) {
+        alert("No se pudo obtener la información de la reserva.");
+        return;
       }
-    } catch (e) {
+
+      const { data: activeCaja, error: cajaError } = await supabase
+        .from('cajas')
+        .select('*')
+        .eq('fecha', selectedFecha)
+        .eq('estado', 'abierta')
+        .single();
+
+      if (cajaError || !activeCaja) {
+        alert("Error: Se requiere una caja abierta para reintegrar la garantía.");
+        return;
+      }
+
+      // 1. Cambiar estado a check_out
+      await supabase
+        .from('reservas')
+        .update({ estado_reserva: 'check_out' })
+        .eq('id', reservaId);
+
+      // 2. Registrar egreso de garantía
+      const txEgresoId = Math.floor(Math.random() * 100000000);
+      await supabase
+        .from('transacciones')
+        .insert({
+          id: txEgresoId,
+          caja_id: activeCaja.id,
+          reserva_id: reservaId,
+          tipo: 'egreso_garantia_efectivo',
+          monto: reserva.monto_garantia,
+          descripcion: `Devolución Garantía Check-Out - ${reserva.nombre_cliente} (${reservaId})`
+        });
+
+      // 3. Restar del total en efectivo actual de la caja
+      const nuevoEfectivo = activeCaja.total_efectivo_actual - reserva.monto_garantia;
+      await supabase
+        .from('cajas')
+        .update({ total_efectivo_actual: nuevoEfectivo })
+        .eq('id', activeCaja.id);
+
+      fetchData(false);
+    } catch (e: any) {
       console.error(e);
+      alert("Error al realizar check-out: " + e.message);
     }
   };
 
   const handleNoShow = async (reservaId: string) => {
     if (!confirm("¿Marcar esta reserva como ausente (No-Show)? Esto liberará la capacidad del monopatín.")) return;
     try {
-      const res = await fetch(`/api/reservas/${reservaId}/no-show`, {
-        method: "POST"
-      });
-      if (res.ok) {
-        fetchData(false);
+      const { data: reserva, error: resError } = await supabase
+        .from('reservas')
+        .select('*')
+        .eq('id', reservaId)
+        .single();
+
+      if (resError || !reserva) return;
+
+      // 1. Cambiar estado a no_show
+      await supabase
+        .from('reservas')
+        .update({ estado_reserva: 'no_show' })
+        .eq('id', reservaId);
+
+      // 2. Liberar monopatines en el turno correspondiente
+      const { data: shift } = await supabase
+        .from('turnos')
+        .select('*')
+        .eq('id', reserva.turno_id)
+        .single();
+
+      if (shift) {
+        await supabase
+          .from('turnos')
+          .update({ 
+            unidades_disponibles: Math.min(shift.total_unidades, shift.unidades_disponibles + reserva.cantidad_monopatines)
+          })
+          .eq('id', reserva.turno_id);
       }
+
+      fetchData(false);
     } catch (e) {
       console.error(e);
     }
@@ -185,14 +358,32 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
   const handleOpenCaja = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch("/api/caja/abrir", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fecha: selectedFecha, monto_apertura: Number(montoAperturaInput) })
-      });
-      if (res.ok) {
-        fetchData(false);
-      }
+      const cajaId = Math.floor(Math.random() * 100000000);
+      
+      // 1. Crear la caja
+      await supabase
+        .from('cajas')
+        .insert({
+          id: cajaId,
+          fecha: selectedFecha,
+          monto_apertura: Number(montoAperturaInput),
+          total_efectivo_actual: Number(montoAperturaInput),
+          estado: 'abierta'
+        });
+
+      // 2. Registrar transacción de apertura
+      const txAperturaId = Math.floor(Math.random() * 100000000);
+      await supabase
+        .from('transacciones')
+        .insert({
+          id: txAperturaId,
+          caja_id: cajaId,
+          tipo: 'apertura',
+          monto: Number(montoAperturaInput),
+          descripcion: 'Apertura de caja diaria - Saldo inicial'
+        });
+
+      fetchData(false);
     } catch (e) {
       console.error(e);
     }
@@ -200,17 +391,31 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
 
   const handleCloseCaja = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!montoCierreInput) return;
+    if (!montoCierreInput || !caja) return;
     try {
-      const res = await fetch("/api/caja/cerrar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fecha: selectedFecha, monto_cierre: Number(montoCierreInput) })
-      });
-      if (res.ok) {
-        fetchData(false);
-        setMontoCierreInput("");
-      }
+      // 1. Cambiar estado de la caja
+      await supabase
+        .from('cajas')
+        .update({
+          estado: 'cerrada',
+          monto_cierre: Number(montoCierreInput)
+        })
+        .eq('id', caja.id);
+
+      // 2. Registrar transacción de cierre
+      const txCierreId = Math.floor(Math.random() * 100000000);
+      await supabase
+        .from('transacciones')
+        .insert({
+          id: txCierreId,
+          caja_id: caja.id,
+          tipo: 'cierre',
+          monto: Number(montoCierreInput),
+          descripcion: 'Cierre de caja diaria - Saldo final declarado'
+        });
+
+      fetchData(false);
+      setMontoCierreInput("");
     } catch (e) {
       console.error(e);
     }
@@ -218,23 +423,32 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
 
   const handleAddManualTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!txMonto || !txDesc) return;
+    if (!txMonto || !txDesc || !caja) return;
     try {
-      const res = await fetch("/api/caja/transaccion", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fecha: selectedFecha,
+      const txId = Math.floor(Math.random() * 100000000);
+      
+      // 1. Insertar transacción
+      await supabase
+        .from('transacciones')
+        .insert({
+          id: txId,
+          caja_id: caja.id,
           tipo: txTipo,
           monto: Number(txMonto),
           descripcion: txDesc
-        })
-      });
-      if (res.ok) {
-        fetchData(false);
-        setTxMonto("");
-        setTxDesc("");
-      }
+        });
+
+      // 2. Ajustar efectivo actual de la caja
+      const factor = txTipo === 'ingreso_manual' ? 1 : -1;
+      const nuevoEfectivo = caja.total_efectivo_actual + (Number(txMonto) * factor);
+      await supabase
+        .from('cajas')
+        .update({ total_efectivo_actual: nuevoEfectivo })
+        .eq('id', caja.id);
+
+      fetchData(false);
+      setTxMonto("");
+      setTxDesc("");
     } catch (e) {
       console.error(e);
     }
@@ -243,22 +457,31 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
   const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch("/api/config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      // Actualizar en la base de datos de Supabase
+      const { error } = await supabase
+        .from('config')
+        .update({
+          precio_por_hora: Number(precioInput),
+          monto_garantia: Number(garantiaInput),
+          porcentaje_sena: Number(senaInput)
+        })
+        .eq('id', 1);
+
+      if (!error) {
+        onUpdateConfig({
           precioPorHora: Number(precioInput),
           montoGarantia: Number(garantiaInput),
           porcentajeSeña: Number(senaInput),
-        })
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        onUpdateConfig(updated);
+          toleranciaNoShowMinutos: config.toleranciaNoShowMinutos,
+          capacidadMaximaScooters: config.capacidadMaximaScooters
+        });
         alert("Configuración de flota actualizada correctamente.");
+      } else {
+        throw new Error(error.message);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      alert("Error al actualizar configuración: " + e.message);
     }
   };
 
