@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Turno, Reserva, Caja, Transaccion, PartnerStats, Config } from "../types";
 import { Calendar, Users, DollarSign, ArrowUpRight, ArrowDownRight, UserCheck, Check, Trash, Plus, ShieldAlert, Sparkles, RefreshCw, BarChart2, Briefcase, FileText, LogOut, TrendingUp, Download, PieChart, Activity, MapPin, Building, Clock } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import posthog from 'posthog-js';
 
 interface AdminPanelProps {
   config: Config;
@@ -250,9 +251,17 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
         .update({ total_efectivo_actual: nuevoEfectivo })
         .eq('id', activeCaja.id);
 
+      posthog.capture('admin_checkin_completed', {
+        reserva_id: reservaId,
+        monto_saldo: reserva.monto_saldo,
+        monto_garantia: reserva.monto_garantia,
+        cantidad_monopatines: reserva.cantidad_monopatines,
+        partner: reserva.partner || null,
+      });
       fetchData(false);
     } catch (e: any) {
       console.error(e);
+      posthog.captureException(e, { level: 'error', extra: { context: 'admin_check_in', reserva_id: reservaId } });
       alert("Error al realizar check-in: " + e.message);
     }
   };
@@ -309,9 +318,15 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
         .update({ total_efectivo_actual: nuevoEfectivo })
         .eq('id', activeCaja.id);
 
+      posthog.capture('admin_checkout_completed', {
+        reserva_id: reservaId,
+        monto_garantia_devuelta: reserva.monto_garantia,
+        partner: reserva.partner || null,
+      });
       fetchData(false);
     } catch (e: any) {
       console.error(e);
+      posthog.captureException(e, { level: 'error', extra: { context: 'admin_check_out', reserva_id: reservaId } });
       alert("Error al realizar check-out: " + e.message);
     }
   };
@@ -343,12 +358,17 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
       if (shift) {
         await supabase
           .from('turnos')
-          .update({ 
+          .update({
             unidades_disponibles: Math.min(shift.total_unidades, shift.unidades_disponibles + reserva.cantidad_monopatines)
           })
           .eq('id', reserva.turno_id);
       }
 
+      posthog.capture('admin_no_show_marked', {
+        reserva_id: reservaId,
+        cantidad_monopatines: reserva.cantidad_monopatines,
+        partner: reserva.partner || null,
+      });
       fetchData(false);
     } catch (e) {
       console.error(e);

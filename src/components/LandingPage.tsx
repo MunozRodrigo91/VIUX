@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ArrowRight, ShieldCheck, MapPin, Check, Info, Clock, Heart, Leaf, FileText, Map } from "lucide-react";
+import posthog from 'posthog-js';
 
 interface LandingPageProps {
   partner?: string;
@@ -9,6 +10,11 @@ interface LandingPageProps {
 export default function LandingPage({ partner, onStartBooking }: LandingPageProps) {
   const [showFullPartnerLanding, setShowFullPartnerLanding] = useState(false);
   const [selectedZone, setSelectedZone] = useState<string>("pinamar");
+
+  const handleStartBooking = () => {
+    posthog.capture('booking_started', { partner: partner || null });
+    onStartBooking();
+  };
 
   const isPartner = !!partner;
   const showHeroAndOffer = !isPartner || showFullPartnerLanding;
@@ -62,7 +68,7 @@ export default function LandingPage({ partner, onStartBooking }: LandingPageProp
 
           <div className="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-4 pt-4">
             <button
-              onClick={onStartBooking}
+              onClick={handleStartBooking}
               className="brand-button w-full sm:w-auto bg-[#FF5500] hover:bg-[#ff6e1a] text-white text-base py-4 px-8 flex items-center justify-center space-x-2.5 shadow-lg shadow-[#FF5500]/20 active:scale-[0.98] transition-all cursor-pointer font-bold rounded-lg uppercase tracking-wide"
             >
               <span>Reservar ahora</span>
@@ -417,7 +423,7 @@ export default function LandingPage({ partner, onStartBooking }: LandingPageProp
           </p>
           <div className="pt-4">
             <button
-              onClick={onStartBooking}
+              onClick={handleStartBooking}
               className="brand-button bg-[#FF5500] hover:bg-[#ff6e1a] text-white text-base py-4 px-10 inline-flex items-center space-x-2.5 shadow-lg shadow-[#FF5500]/10 active:scale-[0.98] transition-all cursor-pointer font-bold rounded-lg uppercase tracking-wider"
             >
               <span>Empezar Reserva</span>

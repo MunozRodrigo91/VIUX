@@ -8,6 +8,7 @@ import LandingPage from "./components/LandingPage";
 import { Sparkles, Compass, ShieldAlert, AlertTriangle, Key, User, ArrowRight, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { supabase } from "./lib/supabase";
+import posthog from 'posthog-js';
 
 export default function App() {
   const [view, setView] = useState<"public" | "admin">("public");
@@ -139,6 +140,7 @@ export default function App() {
 
     const failedId = params.get("reserva_fallida");
     if (failedId) {
+      posthog.capture('booking_payment_failed', { reserva_id: failedId });
       setNotification({
         message: "El pago de la seña con MercadoPago no se pudo completar. Intentá de nuevo.",
         type: "error"
@@ -171,6 +173,16 @@ export default function App() {
   }, []);
 
   const handleBookingSuccess = (reserva: Reserva) => {
+    posthog.capture('booking_confirmed', {
+      reserva_id: reserva.id,
+      cantidad_monopatines: reserva.cantidad_monopatines,
+      monto_total: reserva.monto_total,
+      monto_sena: reserva.monto_seña,
+      delivery_mode: reserva.delivery_mode,
+      partner: reserva.partner || null,
+      fecha_turno: reserva.fecha_turno,
+      hora_turno: reserva.hora_turno,
+    });
     setCurrentReserva(reserva);
     setCurrentStep(5); // Go to step 5 ticket view
     setNotification({
@@ -202,6 +214,8 @@ export default function App() {
       if (error) {
         setLoginError("Usuario o contraseña incorrectos en Supabase. Intentá nuevamente.");
       } else if (data.user) {
+        posthog.identify(data.user.id, { role: 'admin' });
+        posthog.capture('admin_login_succeeded', { user_id: data.user.id });
         await checkIfAdmin(data.user.id);
       }
     } catch (err) {
@@ -212,6 +226,7 @@ export default function App() {
   };
 
   const handleAdminLogout = async () => {
+    posthog.reset();
     await supabase.auth.signOut();
     setIsAdminAuthenticated(false);
     setView("public");

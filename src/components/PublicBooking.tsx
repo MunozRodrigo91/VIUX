@@ -3,6 +3,7 @@ import { Turno, Reserva, Config } from "../types";
 import { Calendar as CalendarIcon, Users, User, Phone, Shield, ArrowRight, ArrowLeft, RefreshCw, AlertTriangle, CreditCard, Sparkles, Mail } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { supabase } from "../lib/supabase";
+import posthog from 'posthog-js';
 
 interface PublicBookingProps {
   partner?: string;
@@ -97,6 +98,14 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
   const handleSelectTurno = (turnoId: string, disponibles: number) => {
     if (disponibles < cantidad) return;
     setSelectedTurnoId(turnoId);
+    const turno = turnos.find(t => t.id === turnoId);
+    posthog.capture('booking_shift_selected', {
+      fecha,
+      hora: turno?.hora,
+      cantidad,
+      unidades_disponibles: disponibles,
+      partner: partner || null,
+    });
   };
 
   const handleCreateReservation = async (e: React.FormEvent) => {
@@ -110,6 +119,15 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
       setBookingError("Por favor ingresá el nombre del hotel o hospedaje para la entrega.");
       return;
     }
+
+    posthog.capture('booking_form_submitted', {
+      cantidad,
+      fecha,
+      delivery_mode: deliveryMode,
+      partner: partner || null,
+      monto_total: totalAlquiler,
+      monto_sena: montoSeña,
+    });
 
     setLoadingBooking(true);
     setBookingError("");
@@ -166,9 +184,16 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
 
       setCreatedReserva(dbReserva as unknown as Reserva);
       setMpCheckoutUrl(`https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=pref_${createdId}`);
+      posthog.capture('booking_payment_step_reached', {
+        reserva_id: createdId,
+        monto_sena: (dbReserva as any).monto_seña,
+        delivery_mode: deliveryMode,
+        partner: partner || null,
+      });
       setStep(4);
     } catch (e: any) {
       console.error(e);
+      posthog.captureException(e, { level: 'error', extra: { context: 'booking_form_submit' } });
       setBookingError(e.message || "Hubo un problema al procesar tu reserva.");
     } finally {
       setLoadingBooking(false);
@@ -177,6 +202,11 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
 
   const handleSimulateInstantPayment = async () => {
     if (!createdReserva) return;
+    posthog.capture('booking_payment_simulated', {
+      reserva_id: createdReserva.id,
+      monto_sena: createdReserva.monto_seña,
+      partner: partner || null,
+    });
     setLoadingBooking(true);
     try {
       // 1. Confirmar pago de la seña en la reserva
@@ -366,7 +396,14 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
 
             {/* Continue button */}
             <button
-              onClick={() => setStep(2)}
+              onClick={() => {
+                posthog.capture('booking_quantity_date_confirmed', {
+                  cantidad,
+                  fecha,
+                  partner: partner || null,
+                });
+                setStep(2);
+              }}
               className="w-full h-12 bg-[#FF5500] hover:bg-[#ff6e1a] text-white rounded-lg font-bold flex items-center justify-center space-x-2 active:scale-[0.99] transition-all cursor-pointer text-sm shadow-lg shadow-[#FF5500]/10 uppercase tracking-wider"
             >
               <span>Ver Turnos Disponibles</span>
@@ -767,6 +804,11 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
                 href={mpCheckoutUrl}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => posthog.capture('booking_mercadopago_clicked', {
+                  reserva_id: createdReserva?.id,
+                  monto_sena: createdReserva?.monto_seña,
+                  partner: partner || null,
+                })}
                 className="w-full h-12 bg-[#009EE3] text-white rounded-lg font-bold flex items-center justify-center space-x-2 hover:bg-[#0084c0] active:scale-[0.99] transition-all text-decoration-none text-sm shadow-sm uppercase tracking-wider"
               >
                 <span>Pagar con MercadoPago (Simulador)</span>
