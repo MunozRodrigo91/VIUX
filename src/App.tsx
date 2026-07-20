@@ -437,9 +437,6 @@ export default function App() {
                         <ArrowRight className="w-4 h-4" />
                       </button>
 
-                      <div className="text-[10px] text-center text-zinc-500 font-mono mt-2 pt-2 border-t border-white/5">
-                        💡 Demo credentials: <strong className="text-zinc-300">admin / admin</strong>
-                      </div>
                     </form>
                   </div>
                 )}

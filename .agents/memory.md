@@ -80,6 +80,7 @@
 - [x] Migrar webhook MercadoPago a Supabase Edge Function (validate-booking y simulación listas)
 - [x] Reemplazar SSE por Supabase Realtime
 - [x] Implementar RLS (Row Level Security) para admin
+- [x] Quitar demo credentials de UI y crear Admin User seguro en auth.users
 - [ ] Agregar iconos PWA (icon-192.png y icon-512.png)
 - [x] Deploy en producción (Vercel / Netlify + Supabase)
 
