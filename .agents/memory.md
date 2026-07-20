@@ -1,7 +1,7 @@
 # VIUX — Memory del Proyecto
 > Última actualización: 2026-07-10
 
-## Estado Actual: MVP LOCAL COMPLETO — Pendiente migración a Supabase
+## Estado Actual: MVP DEPLOYED EN PRODUCCIÓN (Netlify + Supabase)
 
 ---
 
@@ -81,7 +81,7 @@
 - [x] Reemplazar SSE por Supabase Realtime
 - [x] Implementar RLS (Row Level Security) para admin
 - [ ] Agregar iconos PWA (icon-192.png y icon-512.png)
-- [ ] Deploy en producción (Vercel / Netlify + Supabase)
+- [x] Deploy en producción (Vercel / Netlify + Supabase)
 
 ---
 
@@ -91,3 +91,5 @@
 - `data.json` — base de datos local activa (9KB)
 - `mockdata.json` — datos semilla para Supabase (8.5KB)
 - `server.ts` — backend Express completo (1065 líneas / 35KB)
+- `netlify.toml` — configuración de redirecciones y build de Netlify
+
