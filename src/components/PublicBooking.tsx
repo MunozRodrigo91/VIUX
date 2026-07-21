@@ -89,7 +89,14 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
     }
   };
 
-  const precioUnitario = config.precioPorHora;
+  const precioUnitario = (() => {
+    const selectedTurno = turnos.find(t => t.id === selectedTurnoId);
+    if (!selectedTurno) return config.precioPorHora;
+    if (selectedTurno.duracion_horas === 2) return config.precio2Horas;
+    if (selectedTurno.duracion_horas === null) return config.precioDiaCompleto;
+    return config.precioPorHora;
+  })();
+
   const totalAlquiler = precioUnitario * cantidad;
   const montoSeña = Math.round(totalAlquiler * (config.porcentajeSeña / 100));
   const montoSaldo = totalAlquiler - montoSeña;
@@ -441,59 +448,80 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
                 <RefreshCw className="w-8 h-8 text-[#FF5500] animate-spin" />
                 <span className="text-xs text-zinc-400">Verificando disponibilidad de flota...</span>
               </div>
-            ) : turnos.length === 0 ? (
-              <div className="glass-card rounded-xl p-8 text-center text-sm text-zinc-400 border border-white/10">
-                No hay turnos creados por el operador para este día.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-2.5">
-                {turnos.map((turno) => {
-                  const fitsDemand = turno.unidades_disponibles >= cantidad;
-                  const isSelected = selectedTurnoId === turno.id;
-                  
-                  return (
-                    <button
-                      key={turno.id}
-                      type="button"
-                      disabled={!fitsDemand}
-                      onClick={() => handleSelectTurno(turno.id, turno.unidades_disponibles)}
-                      className={`p-4 border rounded-xl flex items-center justify-between text-left transition-all ${
-                        !fitsDemand
-                          ? "opacity-30 bg-black/10 text-zinc-500 cursor-not-allowed border-white/5"
-                          : isSelected
-                            ? "border-[#FF5500] bg-[#FF5500]/15 text-white shadow-sm"
-                            : "border-white/10 bg-black/20 text-white hover:border-[#FF5500]/40 cursor-pointer"
-                      }`}
-                    >
-                      <div>
-                        <div className="text-sm font-bold text-white font-display">{turno.hora} hs</div>
-                        <div className="text-[10px] text-zinc-400 mt-0.5">Duración: 1 Hora contratada</div>
-                      </div>
+            ) : (() => {
+              const now = new Date();
+              const nowHHMM = now.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
+              const isToday = fecha === now.toISOString().split("T")[0];
+              const turnosVisibles = turnos.filter(t => {
+                if (t.habilitado === false) return false;
+                if (isToday && t.hora <= nowHHMM) return false;
+                return true;
+              });
+              if (turnosVisibles.length === 0) return (
+                <div className="glass-card rounded-xl p-8 text-center text-sm text-zinc-400 border border-white/10">
+                  {turnos.length === 0
+                    ? "No hay turnos creados por el operador para este día."
+                    : "No quedan turnos disponibles para el resto del día de hoy."}
+                </div>
+              );
+              return (
+                <div className="grid grid-cols-1 gap-2.5">
+                  {turnosVisibles.map((turno) => {
+                    const fitsDemand = turno.unidades_disponibles >= cantidad;
+                    const isSelected = selectedTurnoId === turno.id;
+                    const durLabel = turno.duracion_horas === 2 ? "2 horas" : turno.duracion_horas === null ? "Día completo" : "1 hora";
+                    const precioEste = turno.duracion_horas === 2
+                      ? config.precio2Horas
+                      : turno.duracion_horas === null
+                        ? config.precioDiaCompleto
+                        : config.precioPorHora;
 
-                      <div className="text-right">
-                        {turno.unidades_disponibles === 0 ? (
-                          <span className="text-[10px] font-bold text-red-400 bg-red-400/10 border border-red-400/20 px-2.5 py-1 rounded-md">
-                            Agotado
-                          </span>
-                        ) : !fitsDemand ? (
-                          <span className="text-[10px] font-bold text-zinc-500 bg-black/20 border border-white/5 px-2.5 py-1 rounded-md">
-                            Faltan unidades
-                          </span>
-                        ) : (
-                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-md border ${
-                            turno.unidades_disponibles === 1 
-                              ? "text-red-400 bg-red-400/10 border-red-400/20"
-                              : "text-[#FF5500] bg-[#FF5500]/10 border-[#FF5500]/25"
-                          }`}>
-                            {turno.unidades_disponibles} {turno.unidades_disponibles === 1 ? "libre" : "libres"}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+                    return (
+                      <button
+                        key={turno.id}
+                        type="button"
+                        disabled={!fitsDemand}
+                        onClick={() => handleSelectTurno(turno.id, turno.unidades_disponibles)}
+                        className={`p-4 border rounded-xl flex items-center justify-between text-left transition-all ${
+                          !fitsDemand
+                            ? "opacity-30 bg-black/10 text-zinc-500 cursor-not-allowed border-white/5"
+                            : isSelected
+                              ? "border-[#FF5500] bg-[#FF5500]/15 text-white shadow-sm"
+                              : "border-white/10 bg-black/20 text-white hover:border-[#FF5500]/40 cursor-pointer"
+                        }`}
+                      >
+                        <div>
+                          <div className="text-sm font-bold text-white font-display">{turno.hora} hs</div>
+                          <div className="text-[10px] text-zinc-400 mt-0.5">
+                            Duración: {durLabel} &nbsp;&middot;&nbsp; ${precioEste.toLocaleString("es-AR")} / monopatín
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          {turno.unidades_disponibles === 0 ? (
+                            <span className="text-[10px] font-bold text-red-400 bg-red-400/10 border border-red-400/20 px-2.5 py-1 rounded-md">
+                              Agotado
+                            </span>
+                          ) : !fitsDemand ? (
+                            <span className="text-[10px] font-bold text-zinc-500 bg-black/20 border border-white/5 px-2.5 py-1 rounded-md">
+                              Faltan unidades
+                            </span>
+                          ) : (
+                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-md border ${
+                              turno.unidades_disponibles === 1
+                                ? "text-red-400 bg-red-400/10 border-red-400/20"
+                                : "text-[#FF5500] bg-[#FF5500]/10 border-[#FF5500]/25"
+                            }`}>
+                              {turno.unidades_disponibles} {turno.unidades_disponibles === 1 ? "libre" : "libres"}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
 
             {selectedTurnoId && (
               <button

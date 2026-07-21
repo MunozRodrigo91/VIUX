@@ -70,6 +70,14 @@
 - [x] Check-In requiere caja ABIERTA
 - [x] Estados de reserva: creada → seña_pagada → check_in → check_out / no_show
 - [x] Turnos de 09:00 a 19:00 con auto-generación por fecha
+- [x] **Gestión avanzada de turnos en Panel de Operación (2026-07-21)**:
+    - Toggle habilitar/inhabilitar horario (campo `habilitado BOOLEAN` en tabla `turnos`)
+    - Selector de duración por turno: 1h / 2h / Día completo (campo `duracion_horas INTEGER NULL`)
+    - Turnos inhabilitados NO se muestran al cliente
+    - Horarios pasados (hora < hora actual, mismo día) NO se muestran al cliente
+    - Precios diferenciados por duración: `precio_2_horas` y `precio_dia_completo` en tabla `config`
+    - Panel de Ajustes muestra los 3 precios editables: 1h, 2h, Día completo
+    - Seleccionar 0 monopatines inhabilita el turno automáticamente
 
 ---
 

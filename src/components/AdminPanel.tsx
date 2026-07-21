@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Turno, Reserva, Caja, Transaccion, PartnerStats, Config } from "../types";
-import { Calendar, Users, DollarSign, ArrowUpRight, ArrowDownRight, UserCheck, Check, Trash, Plus, ShieldAlert, Sparkles, RefreshCw, BarChart2, Briefcase, FileText, LogOut, TrendingUp, Download, PieChart, Activity, MapPin, Building, Clock } from "lucide-react";
+import { Calendar, Users, DollarSign, ArrowUpRight, ArrowDownRight, UserCheck, Check, Trash, Plus, ShieldAlert, Sparkles, RefreshCw, BarChart2, Briefcase, FileText, LogOut, TrendingUp, Download, PieChart, Activity, MapPin, Building, Clock, ToggleLeft, ToggleRight, Timer } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import posthog from 'posthog-js';
 
@@ -28,6 +28,8 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
 
   // Config fields
   const [precioInput, setPrecioInput] = useState<string>(config.precioPorHora.toString());
+  const [precio2HorasInput, setPrecio2HorasInput] = useState<string>(config.precio2Horas.toString());
+  const [precioDiaCompletoInput, setPrecioDiaCompletoInput] = useState<string>(config.precioDiaCompleto.toString());
   const [garantiaInput, setGarantiaInput] = useState<string>(config.montoGarantia.toString());
   const [senaInput, setSenaInput] = useState<string>(config.porcentajeSeña.toString());
 
@@ -169,11 +171,36 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
 
   const handleUpdateTurnoCapacity = async (turnoId: string, capacity: number) => {
     try {
+      const updates: Record<string, any> = { total_unidades: capacity, unidades_disponibles: capacity };
+      if (capacity === 0) updates.habilitado = false;
       await supabase
         .from('turnos')
-        .update({ total_unidades: capacity, unidades_disponibles: capacity })
+        .update(updates)
         .eq('id', turnoId);
-      
+      fetchData(false);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleToggleTurno = async (turnoId: string, currentHabilitado: boolean) => {
+    try {
+      await supabase
+        .from('turnos')
+        .update({ habilitado: !currentHabilitado })
+        .eq('id', turnoId);
+      fetchData(false);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleUpdateTurnoDuracion = async (turnoId: string, duracion: 1 | 2 | null) => {
+    try {
+      await supabase
+        .from('turnos')
+        .update({ duracion_horas: duracion })
+        .eq('id', turnoId);
       fetchData(false);
     } catch (e) {
       console.error(e);
@@ -477,11 +504,12 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
   const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Actualizar en la base de datos de Supabase
       const { error } = await supabase
         .from('config')
         .update({
           precio_por_hora: Number(precioInput),
+          precio_2_horas: Number(precio2HorasInput),
+          precio_dia_completo: Number(precioDiaCompletoInput),
           monto_garantia: Number(garantiaInput),
           porcentaje_sena: Number(senaInput)
         })
@@ -490,12 +518,14 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
       if (!error) {
         onUpdateConfig({
           precioPorHora: Number(precioInput),
+          precio2Horas: Number(precio2HorasInput),
+          precioDiaCompleto: Number(precioDiaCompletoInput),
           montoGarantia: Number(garantiaInput),
           porcentajeSeña: Number(senaInput),
           toleranciaNoShowMinutos: config.toleranciaNoShowMinutos,
           capacidadMaximaScooters: config.capacidadMaximaScooters
         });
-        alert("Configuración de flota actualizada correctamente.");
+        alert("Configuración de precios actualizada correctamente.");
       } else {
         throw new Error(error.message);
       }
@@ -961,52 +991,139 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
 
           {/* TAB 2: HORARIOS & CAPACIDAD */}
           {activeTab === "turnos" && (
-            <div className="glass-card border border-white/10 rounded-2xl p-6 space-y-6">
+            <div className="glass-card border border-white/10 rounded-2xl p-6 space-y-5">
               <div>
-                <h3 className="text-base font-extrabold text-white uppercase tracking-wide">Capacidad de Flota por Turno</h3>
+                <h3 className="text-base font-extrabold text-white uppercase tracking-wide">Horarios & Capacidad de Flota</h3>
                 <p className="text-xs text-zinc-400 mt-1 font-light leading-relaxed">
-                  Configurá cuántos de los 4 monopatines físicos están disponibles para alquiler en cada turno horario.
+                  Habilitá o inhabilitá turnos, configurá la duración y cuántos de los 4 monopatines están disponibles. Los horarios pasados no los ven los clientes automáticamente.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
-                {turnos.map((turno) => (
-                  <div key={turno.id} className="border border-white/10 rounded-2xl p-4 flex flex-col justify-between space-y-3 bg-black/20">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="text-sm font-extrabold text-white font-mono">{turno.hora} hs</div>
-                        <div className="text-[10px] text-zinc-500 mt-0.5">Fecha: {turno.fecha}</div>
-                      </div>
-                      <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border ${
-                        turno.unidades_disponibles === 0 
-                          ? "bg-red-950/20 text-red-400 border-red-500/15" 
-                          : "bg-emerald-950/20 text-emerald-400 border-emerald-500/15"
-                      }`}>
-                        Libres: {turno.unidades_disponibles} / {turno.total_unidades}
-                      </span>
-                    </div>
+              {/* Legend */}
+              <div className="flex flex-wrap gap-4 text-[10px] font-bold uppercase tracking-wider">
+                <span className="flex items-center gap-1.5 text-emerald-400"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />Habilitado</span>
+                <span className="flex items-center gap-1.5 text-zinc-500"><span className="w-2 h-2 rounded-full bg-zinc-600 inline-block" />Inhabilitado</span>
+                <span className="flex items-center gap-1.5 text-amber-400"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />Hora pasada</span>
+              </div>
 
-                    <div className="pt-2.5 border-t border-white/5">
-                      <span className="text-[10px] font-bold text-zinc-400 block mb-1.5 uppercase">Flota Habilitada:</span>
-                      <div className="flex items-center space-x-1">
-                        {[0, 1, 2, 3, 4].map((num) => (
+              {turnos.length === 0 ? (
+                <div className="text-center text-xs text-zinc-500 py-12 border border-dashed border-white/10 rounded-2xl">
+                  No hay turnos para {selectedFecha.split("-").reverse().join("/")}. Los turnos se generan al crear la fecha en Supabase.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {turnos.map((turno) => {
+                    const isToday = turno.fecha === new Date().toISOString().split("T")[0];
+                    const nowHHMM = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
+                    const isPast = isToday && turno.hora < nowHHMM;
+                    const isEnabled = turno.habilitado !== false;
+                    const durLabel = turno.duracion_horas === 2 ? "2 horas" : turno.duracion_horas === null ? "Día completo" : "1 hora";
+
+                    return (
+                      <div
+                        key={turno.id}
+                        className={`border rounded-2xl p-4 flex flex-col gap-3 transition-all ${
+                          isPast
+                            ? "border-amber-500/20 bg-amber-950/10 opacity-70"
+                            : isEnabled
+                              ? "border-emerald-500/20 bg-black/20"
+                              : "border-white/5 bg-black/10 opacity-55"
+                        }`}
+                      >
+                        {/* Header */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base font-extrabold text-white font-mono">{turno.hora} hs</span>
+                            {isPast && (
+                              <span className="text-[9px] font-bold bg-amber-950/30 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-md uppercase">Pasado</span>
+                            )}
+                            {!isEnabled && !isPast && (
+                              <span className="text-[9px] font-bold bg-zinc-900 text-zinc-500 border border-white/5 px-2 py-0.5 rounded-md uppercase">Oculto</span>
+                            )}
+                          </div>
+                          <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border ${
+                            turno.unidades_disponibles === 0
+                              ? "bg-red-950/20 text-red-400 border-red-500/15"
+                              : "bg-emerald-950/20 text-emerald-400 border-emerald-500/15"
+                          }`}>
+                            {turno.unidades_disponibles}/{turno.total_unidades} libres
+                          </span>
+                        </div>
+
+                        {/* Duracion badge */}
+                        <div className="flex items-center gap-1.5 text-[10px] text-zinc-400">
+                          <Timer className="w-3 h-3 text-[#FF5500] shrink-0" />
+                          Duración actual: <span className="text-white font-bold ml-0.5">{durLabel}</span>
+                        </div>
+
+                        {/* Toggle habilitado */}
+                        <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Visibilidad clientes</span>
                           <button
-                            key={num}
-                            onClick={() => handleUpdateTurnoCapacity(turno.id, num)}
-                            className={`w-8 h-8 text-xs font-bold rounded-lg flex items-center justify-center border transition-all cursor-pointer ${
-                              turno.total_unidades === num
-                                ? "bg-[#FF5500] border-[#FF5500] text-white shadow-[0_0_8px_rgba(255,85,0,0.4)]"
-                                : "bg-black/40 border-white/10 text-zinc-300 hover:bg-zinc-800"
+                            onClick={() => handleToggleTurno(turno.id, isEnabled)}
+                            disabled={isPast}
+                            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border text-[10px] font-bold transition-all cursor-pointer ${
+                              isPast
+                                ? "opacity-40 cursor-not-allowed border-white/5 text-zinc-600"
+                                : isEnabled
+                                  ? "border-emerald-500/30 bg-emerald-950/20 text-emerald-400 hover:bg-emerald-950/40"
+                                  : "border-red-500/25 bg-red-950/15 text-red-400 hover:bg-red-950/30"
                             }`}
                           >
-                            {num}
+                            {isEnabled
+                              ? <><ToggleRight className="w-4 h-4" /><span>ON</span></>
+                              : <><ToggleLeft className="w-4 h-4" /><span>OFF</span></>
+                            }
                           </button>
-                        ))}
+                        </div>
+
+                        {/* Duracion selector */}
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Duración del turno:</span>
+                          <div className="flex gap-1.5">
+                            {([1, 2, null] as (1 | 2 | null)[]).map((dur) => (
+                              <button
+                                key={String(dur)}
+                                onClick={() => handleUpdateTurnoDuracion(turno.id, dur)}
+                                className={`flex-1 h-8 text-[11px] font-bold rounded-lg border transition-all cursor-pointer ${
+                                  turno.duracion_horas === dur
+                                    ? "bg-[#FF5500] border-[#FF5500] text-white shadow-[0_0_8px_rgba(255,85,0,0.35)]"
+                                    : "bg-black/40 border-white/10 text-zinc-400 hover:bg-zinc-800 hover:text-white"
+                                }`}
+                              >
+                                {dur === 1 ? "1 h" : dur === 2 ? "2 h" : "Día"}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Capacidad selector */}
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Monopatines disponibles:</span>
+                          <div className="flex gap-1">
+                            {[0, 1, 2, 3, 4].map((num) => (
+                              <button
+                                key={num}
+                                onClick={() => handleUpdateTurnoCapacity(turno.id, num)}
+                                className={`flex-1 h-8 text-xs font-bold rounded-lg flex items-center justify-center border transition-all cursor-pointer ${
+                                  turno.total_unidades === num
+                                    ? "bg-[#FF5500] border-[#FF5500] text-white shadow-[0_0_8px_rgba(255,85,0,0.4)]"
+                                    : num === 0
+                                      ? "bg-red-950/20 border-red-500/15 text-red-400 hover:bg-red-950/40"
+                                      : "bg-black/40 border-white/10 text-zinc-300 hover:bg-zinc-800"
+                                }`}
+                              >
+                                {num}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-[9px] text-zinc-600">Seleccionar 0 inhabilita automáticamente</p>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -1282,26 +1399,62 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
           {activeTab === "config" && (
             <div className="glass-card border border-white/10 rounded-2xl p-6 space-y-6 max-w-md mx-auto">
               <div>
-                <h3 className="text-base font-extrabold text-white uppercase tracking-wide">Ajustes Generales de Flota</h3>
+                <h3 className="text-base font-extrabold text-white uppercase tracking-wide">Ajustes de Precios & Flota</h3>
                 <p className="text-xs text-zinc-400 mt-1 font-light leading-relaxed">
-                  Definí los precios por hora, porcentaje de seña online y montos de garantías requeridas.
+                  Definí los precios por duración de turno, porcentaje de seña online y montos de garantías requeridas.
                 </p>
               </div>
 
               <form onSubmit={handleSaveConfig} className="space-y-4">
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-300 block mb-1">
-                    Precio por Hora por Monopatín ($ ARS):
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    value={precioInput}
-                    onChange={(e) => setPrecioInput(e.target.value)}
-                    className="w-full h-11 border border-white/10 rounded-xl px-3 bg-black/40 text-sm font-mono font-bold text-white focus:outline-none focus:border-[#FF5500]"
-                  />
+                {/* Pricing section */}
+                <div className="bg-black/20 border border-white/5 rounded-xl p-4 space-y-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Timer className="w-4 h-4 text-[#FF5500]" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#FF5500]">Precios por duración de turno</span>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-300 block mb-1">
+                      Precio 1 Hora por Monopatín ($ ARS):
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      value={precioInput}
+                      onChange={(e) => setPrecioInput(e.target.value)}
+                      className="w-full h-11 border border-white/10 rounded-xl px-3 bg-black/40 text-sm font-mono font-bold text-white focus:outline-none focus:border-[#FF5500]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-300 block mb-1">
+                      Precio 2 Horas por Monopatín ($ ARS):
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      value={precio2HorasInput}
+                      onChange={(e) => setPrecio2HorasInput(e.target.value)}
+                      className="w-full h-11 border border-white/10 rounded-xl px-3 bg-black/40 text-sm font-mono font-bold text-white focus:outline-none focus:border-[#FF5500]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-300 block mb-1">
+                      Precio Día Completo por Monopatín ($ ARS):
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      value={precioDiaCompletoInput}
+                      onChange={(e) => setPrecioDiaCompletoInput(e.target.value)}
+                      className="w-full h-11 border border-white/10 rounded-xl px-3 bg-black/40 text-sm font-mono font-bold text-white focus:outline-none focus:border-[#FF5500]"
+                    />
+                    <p className="text-[10px] text-zinc-500 mt-1 font-light">Estos precios se aplican automáticamente según la duración configurada en cada turno.</p>
+                  </div>
                 </div>
 
+                {/* Garantia + Seña */}
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-300 block mb-1">
                     Monto de Garantía por Unidad ($ ARS):
@@ -1313,7 +1466,7 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
                     onChange={(e) => setGarantiaInput(e.target.value)}
                     className="w-full h-11 border border-white/10 rounded-xl px-3 bg-black/40 text-sm font-mono font-bold text-white focus:outline-none focus:border-[#FF5500]"
                   />
-                  <p className="text-[10px] text-zinc-500 mt-1 font-light leading-relaxed">Este monto se recibe en efectivo al hacer check-in y se devuelve al check-out.</p>
+                  <p className="text-[10px] text-zinc-500 mt-1 font-light leading-relaxed">Se recibe en efectivo al check-in y se devuelve al check-out.</p>
                 </div>
 
                 <div>
@@ -1335,7 +1488,7 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
                   type="submit"
                   className="w-full h-11 bg-[#FF5500] hover:bg-[#ff6e1a] text-white rounded-xl font-bold text-sm transition-all cursor-pointer shadow-[0_0_12px_rgba(255,85,0,0.3)] uppercase tracking-wider"
                 >
-                  Guardar Cambios
+                  Guardar Cambios de Precios
                 </button>
               </form>
             </div>

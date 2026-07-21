@@ -20,6 +20,8 @@ export default function App() {
   // App Config
   const [config, setConfig] = useState<Config>({
     precioPorHora: 8000,
+    precio2Horas: 14000,
+    precioDiaCompleto: 35000,
     montoGarantia: 10000,
     porcentajeSeña: 30,
     toleranciaNoShowMinutos: 15,
@@ -74,6 +76,8 @@ export default function App() {
         if (!error && data) {
           setConfig({
             precioPorHora: data.precio_por_hora,
+            precio2Horas: data.precio_2_horas ?? 0,
+            precioDiaCompleto: data.precio_dia_completo ?? 0,
             montoGarantia: data.monto_garantia,
             porcentajeSeña: data.porcentaje_sena,
             toleranciaNoShowMinutos: data.tolerancia_no_show_minutos,

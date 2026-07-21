@@ -32,6 +32,8 @@ const TOMORROW_STR = getLocalDateString(1);
 // Default Configuration
 const DEFAULT_CONFIG: Config = {
   precioPorHora: 8000,
+  precio2Horas: 14000,
+  precioDiaCompleto: 35000,
   montoGarantia: 10000,
   porcentajeSeña: 30,
   toleranciaNoShowMinutos: 15,
@@ -68,7 +70,9 @@ function loadDB(): DB {
         fecha,
         hora,
         total_unidades: 4,
-        unidades_disponibles: 4
+        unidades_disponibles: 4,
+        habilitado: true,
+        duracion_horas: 1
       });
     });
   });
@@ -341,7 +345,9 @@ app.get("/api/turnos", (req, res) => {
           fecha: fecha as string,
           hora,
           total_unidades: dbInstance.config.capacidadMaximaScooters,
-          unidades_disponibles: dbInstance.config.capacidadMaximaScooters
+          unidades_disponibles: dbInstance.config.capacidadMaximaScooters,
+          habilitado: true,
+          duracion_horas: 1
         });
       });
       saveDB(dbInstance);

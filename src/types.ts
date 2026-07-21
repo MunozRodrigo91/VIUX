@@ -1,10 +1,14 @@
 export interface Config {
   precioPorHora: number; // e.g. 8000
+  precio2Horas: number; // e.g. 14000
+  precioDiaCompleto: number; // e.g. 35000
   montoGarantia: number; // e.g. 10000
   porcentajeSeña: number; // e.g. 30
   toleranciaNoShowMinutos: number; // e.g. 15
   capacidadMaximaScooters: number; // e.g. 4
 }
+
+export type DuracionTurno = 1 | 2 | null; // null = día completo
 
 export interface Turno {
   id: string;
@@ -12,6 +16,8 @@ export interface Turno {
   hora: string; // e.g. "09:00", "10:00", "11:00", etc.
   total_unidades: number; // e.g. 4
   unidades_disponibles: number; // computed as total_unidades - sum of quantity of active reservations
+  habilitado: boolean; // if false, hidden from public booking
+  duracion_horas: DuracionTurno; // 1, 2, or null (full day)
 }
 
 export type EstadoPago = 'pendiente' | 'seña_pagada' | 'reembolsado';
