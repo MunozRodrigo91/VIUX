@@ -1,7 +1,10 @@
 # VIUX — Memory del Proyecto
-> Última actualización: 2026-07-10
+> Última actualización: 2026-07-21
 
-## Estado Actual: MVP DEPLOYED EN PRODUCCIÓN (Netlify + Supabase)
+## ⚠️ BUG CONOCIDO RESUELTO: Recursión infinita en RLS de `profiles`
+- La política `"Admin total sobre perfiles"` consultaba `profiles` para verificar si el usuario era admin → loop infinito
+- Solución: reemplazada por `(auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'`
+- También se corrigió el campo login: de texto libre a `type="email"` (evitaba confusión de credenciales)
 
 ---
 
