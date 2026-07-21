@@ -14,12 +14,20 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
+          const hadActiveServiceWorker = Boolean(navigator.serviceWorker.controller);
+
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (hadActiveServiceWorker && !sessionStorage.getItem('viux-sw-refreshed')) {
+              sessionStorage.setItem('viux-sw-refreshed', 'true');
+              window.location.reload();
+            }
+          });
+
           navigator.serviceWorker.register('/sw.js')
-            .then(reg => console.log('Service Worker registrado con éxito:', reg.scope))
+            .then(registration => registration.update())
             .catch(err => console.error('Error al registrar Service Worker:', err));
         });
       }
     </script>
   </body>
 </html>
-
