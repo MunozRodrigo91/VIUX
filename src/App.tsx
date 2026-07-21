@@ -44,16 +44,20 @@ export default function App() {
         .select('role')
         .eq('id', userId)
         .single();
-      
+
       if (!error && data?.role === 'admin') {
         setIsAdminAuthenticated(true);
       } else {
+        // No hacer signOut acá para evitar loop con onAuthStateChange.
+        // Simplemente marcamos como no autenticado y mostramos el error.
         setIsAdminAuthenticated(false);
-        await supabase.auth.signOut();
         setLoginError("Acceso denegado: No tenés permisos de administrador.");
+        // signOut separado y silencioso
+        supabase.auth.signOut().catch(() => {});
       }
     } catch (err) {
       setIsAdminAuthenticated(false);
+      setLoginError("Error al verificar permisos. Intentá nuevamente.");
     }
   };
 
@@ -207,7 +211,7 @@ export default function App() {
       // Iniciar sesión con Supabase Auth.
       // Como solo manejamos un admin, se puede loguear con su correo de Supabase.
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: loginUser.includes('@') ? loginUser : `${loginUser}@viux.com`,
+        email: loginUser.trim(),
         password: loginPassword,
       });
 
@@ -386,16 +390,16 @@ export default function App() {
                     <form onSubmit={handleAdminLogin} className="glass-card rounded-2xl p-6 space-y-4 border border-white/10 relative overflow-hidden">
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-300 block">
-                          Nombre de Usuario
+                          Email
                         </label>
                         <div className="relative">
                           <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500">
                             <User className="w-4.5 h-4.5 text-[#FF5500]" />
                           </span>
                           <input
-                            type="text"
+                            type="email"
                             required
-                            placeholder="admin"
+                            placeholder="tu@email.com"
                             value={loginUser}
                             onChange={(e) => setLoginUser(e.target.value)}
                             className="w-full h-11 border border-white/10 rounded-xl pl-10 pr-4 bg-black/40 text-xs text-white focus:outline-none focus:border-[#FF5500] transition-all placeholder-zinc-500 font-bold"
