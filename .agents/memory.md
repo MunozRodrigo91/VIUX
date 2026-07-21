@@ -78,6 +78,12 @@
     - Precios diferenciados por duración: `precio_2_horas` y `precio_dia_completo` en tabla `config`
     - Panel de Ajustes muestra los 3 precios editables: 1h, 2h, Día completo
     - Seleccionar 0 monopatines inhabilita el turno automáticamente
+- [x] **CRUD completo de turnos en Panel de Operación (2026-07-21)**:
+    - Formulario para crear turnos: hora (select 08:00-20:00), duración (1h/2h/Día), monopatines (1-4)
+    - Validación anti-duplicado (misma fecha + misma hora)
+    - Botón "Generar día completo": crea en un click los turnos de 09:00 a 19:00 faltantes
+    - Botón de eliminación individual por turno (con confirmación)
+    - Lista de turnos ordenada por hora con edición inline de duración, capacidad y visibilidad
 
 ---
 

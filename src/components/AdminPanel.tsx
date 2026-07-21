@@ -42,6 +42,12 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
   const [allReservas, setAllReservas] = useState<Reserva[]>([]);
   const [loadingAnalytics, setLoadingAnalytics] = useState<boolean>(false);
 
+  // Turno creation form
+  const [newTurnoHora, setNewTurnoHora] = useState<string>("09:00");
+  const [newTurnoDuracion, setNewTurnoDuracion] = useState<1 | 2 | null>(1);
+  const [newTurnoCapacidad, setNewTurnoCapacidad] = useState<number>(4);
+  const [creatingTurno, setCreatingTurno] = useState<boolean>(false);
+
   useEffect(() => {
     fetchData();
 
@@ -204,6 +210,76 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
       fetchData(false);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleCreateTurno = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreatingTurno(true);
+    try {
+      // Check for duplicate (same fecha + hora)
+      const exists = turnos.some(t => t.fecha === selectedFecha && t.hora === newTurnoHora);
+      if (exists) {
+        alert(`Ya existe un turno a las ${newTurnoHora} para ${selectedFecha.split('-').reverse().join('/')}`);
+        return;
+      }
+      const id = `${selectedFecha}_${newTurnoHora.replace(':', '')}_${Date.now()}`;
+      const { error } = await supabase.from('turnos').insert({
+        id,
+        fecha: selectedFecha,
+        hora: newTurnoHora,
+        total_unidades: newTurnoCapacidad,
+        unidades_disponibles: newTurnoCapacidad,
+        habilitado: true,
+        duracion_horas: newTurnoDuracion
+      });
+      if (error) throw error;
+      fetchData(false);
+    } catch (e: any) {
+      console.error(e);
+      alert('Error al crear el turno: ' + (e.message || e));
+    } finally {
+      setCreatingTurno(false);
+    }
+  };
+
+  const handleDeleteTurno = async (turnoId: string, hora: string) => {
+    if (!window.confirm(`¿Eliminás el turno de las ${hora} hs? Esta acción no se puede deshacer.`)) return;
+    try {
+      const { error } = await supabase.from('turnos').delete().eq('id', turnoId);
+      if (error) throw error;
+      fetchData(false);
+    } catch (e: any) {
+      console.error(e);
+      alert('Error al eliminar el turno: ' + (e.message || e));
+    }
+  };
+
+  const handleGenerarDia = async () => {
+    const HORAS = ['09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00'];
+    const existentes = turnos.map(t => t.hora);
+    const nuevas = HORAS.filter(h => !existentes.includes(h));
+    if (nuevas.length === 0) {
+      alert('Ya existen turnos para todas las horas del día.');
+      return;
+    }
+    if (!window.confirm(`Se crearán ${nuevas.length} turno(s) faltantes para ${selectedFecha.split('-').reverse().join('/')} con ${newTurnoCapacidad} monopatines cada uno. ¿Continuar?`)) return;
+    try {
+      const inserts = nuevas.map(hora => ({
+        id: `${selectedFecha}_${hora.replace(':', '')}_${Date.now()}_${hora}`,
+        fecha: selectedFecha,
+        hora,
+        total_unidades: newTurnoCapacidad,
+        unidades_disponibles: newTurnoCapacidad,
+        habilitado: true,
+        duracion_horas: newTurnoDuracion
+      }));
+      const { error } = await supabase.from('turnos').insert(inserts);
+      if (error) throw error;
+      fetchData(false);
+    } catch (e: any) {
+      console.error(e);
+      alert('Error al generar el día: ' + (e.message || e));
     }
   };
 
@@ -991,139 +1067,238 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
 
           {/* TAB 2: HORARIOS & CAPACIDAD */}
           {activeTab === "turnos" && (
-            <div className="glass-card border border-white/10 rounded-2xl p-6 space-y-5">
-              <div>
-                <h3 className="text-base font-extrabold text-white uppercase tracking-wide">Horarios & Capacidad de Flota</h3>
-                <p className="text-xs text-zinc-400 mt-1 font-light leading-relaxed">
-                  Habilitá o inhabilitá turnos, configurá la duración y cuántos de los 4 monopatines están disponibles. Los horarios pasados no los ven los clientes automáticamente.
-                </p>
+            <div className="space-y-4">
+
+              {/* ===== PANEL DE CREACION ===== */}
+              <div className="glass-card border border-[#FF5500]/25 rounded-2xl p-5 bg-[#FF5500]/5 space-y-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Plus className="w-4 h-4 text-[#FF5500]" />
+                  <h3 className="text-sm font-extrabold text-white uppercase tracking-wide">Nuevo Turno</h3>
+                  <span className="ml-auto text-[10px] text-zinc-400 font-mono">{selectedFecha.split('-').reverse().join('/')}</span>
+                </div>
+
+                <form onSubmit={handleCreateTurno} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Hora */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">Hora de inicio</label>
+                    <select
+                      value={newTurnoHora}
+                      onChange={e => setNewTurnoHora(e.target.value)}
+                      className="w-full h-11 border border-white/10 rounded-xl px-3 bg-black/60 text-sm font-mono font-bold text-white focus:outline-none focus:border-[#FF5500] cursor-pointer"
+                    >
+                      {['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00'].map(h => (
+                        <option key={h} value={h}>{h} hs</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Duracion */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">Duración</label>
+                    <div className="flex gap-1.5 h-11">
+                      {([1, 2, null] as (1 | 2 | null)[]).map(dur => (
+                        <button
+                          key={String(dur)}
+                          type="button"
+                          onClick={() => setNewTurnoDuracion(dur)}
+                          className={`flex-1 text-[11px] font-bold rounded-xl border transition-all cursor-pointer ${
+                            newTurnoDuracion === dur
+                              ? 'bg-[#FF5500] border-[#FF5500] text-white shadow-[0_0_8px_rgba(255,85,0,0.35)]'
+                              : 'bg-black/40 border-white/10 text-zinc-400 hover:bg-zinc-800 hover:text-white'
+                          }`}
+                        >
+                          {dur === 1 ? '1 h' : dur === 2 ? '2 h' : 'Día'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Monopatines */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">Monopatines</label>
+                    <div className="flex gap-1 h-11">
+                      {[1,2,3,4].map(n => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => setNewTurnoCapacidad(n)}
+                          className={`flex-1 text-sm font-bold rounded-xl border transition-all cursor-pointer ${
+                            newTurnoCapacidad === n
+                              ? 'bg-[#FF5500] border-[#FF5500] text-white shadow-[0_0_8px_rgba(255,85,0,0.35)]'
+                              : 'bg-black/40 border-white/10 text-zinc-300 hover:bg-zinc-800'
+                          }`}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Botones Submit + Generar día */}
+                  <div className="sm:col-span-3 flex gap-2 pt-1">
+                    <button
+                      type="submit"
+                      disabled={creatingTurno}
+                      className="flex-1 h-11 bg-[#FF5500] hover:bg-[#ff6e1a] text-white rounded-xl font-bold text-sm transition-all cursor-pointer shadow-[0_0_12px_rgba(255,85,0,0.3)] uppercase tracking-wider disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      {creatingTurno ? 'Creando...' : 'Crear Turno'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleGenerarDia}
+                      className="h-11 px-5 border border-[#FF5500]/30 text-[#FF5500] hover:bg-[#FF5500]/10 rounded-xl font-bold text-xs transition-all cursor-pointer uppercase tracking-wider whitespace-nowrap flex items-center gap-1.5"
+                    >
+                      <Calendar className="w-3.5 h-3.5" />
+                      Generar día completo
+                    </button>
+                  </div>
+                </form>
               </div>
 
-              {/* Legend */}
-              <div className="flex flex-wrap gap-4 text-[10px] font-bold uppercase tracking-wider">
-                <span className="flex items-center gap-1.5 text-emerald-400"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />Habilitado</span>
-                <span className="flex items-center gap-1.5 text-zinc-500"><span className="w-2 h-2 rounded-full bg-zinc-600 inline-block" />Inhabilitado</span>
-                <span className="flex items-center gap-1.5 text-amber-400"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />Hora pasada</span>
+              {/* ===== LISTA DE TURNOS ===== */}
+              <div className="glass-card border border-white/10 rounded-2xl p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-white uppercase tracking-wide">Turnos del día</h3>
+                    <p className="text-xs text-zinc-400 mt-0.5 font-light">
+                      {selectedFecha.split('-').reverse().join('/')} &mdash; {turnos.length} turno(s) cargado(s)
+                    </p>
+                  </div>
+                  {/* Legend */}
+                  <div className="flex gap-3 text-[10px] font-bold uppercase tracking-wider">
+                    <span className="flex items-center gap-1 text-emerald-400"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />ON</span>
+                    <span className="flex items-center gap-1 text-zinc-500"><span className="w-2 h-2 rounded-full bg-zinc-600 inline-block" />OFF</span>
+                    <span className="flex items-center gap-1 text-amber-400"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />Pasado</span>
+                  </div>
+                </div>
+
+                {turnos.length === 0 ? (
+                  <div className="text-center text-xs text-zinc-500 py-10 border border-dashed border-white/10 rounded-2xl">
+                    No hay turnos para {selectedFecha.split('-').reverse().join('/')}.<br />
+                    <span className="text-zinc-600">Creá uno arriba o usá "Generar día completo".</span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {turnos
+                      .slice()
+                      .sort((a, b) => a.hora.localeCompare(b.hora))
+                      .map((turno) => {
+                      const isToday = turno.fecha === new Date().toISOString().split('T')[0];
+                      const nowHHMM = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+                      const isPast = isToday && turno.hora < nowHHMM;
+                      const isEnabled = turno.habilitado !== false;
+                      const durLabel = turno.duracion_horas === 2 ? '2 h' : turno.duracion_horas === null ? 'Día' : '1 h';
+
+                      return (
+                        <div
+                          key={turno.id}
+                          className={`border rounded-2xl p-3.5 flex flex-col gap-2.5 transition-all ${
+                            isPast
+                              ? 'border-amber-500/20 bg-amber-950/10 opacity-70'
+                              : isEnabled
+                                ? 'border-emerald-500/20 bg-black/20'
+                                : 'border-white/5 bg-black/10 opacity-55'
+                          }`}
+                        >
+                          {/* Row 1: Hora + badge + delete */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-base font-extrabold text-white font-mono">{turno.hora} hs</span>
+                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border ${
+                                isPast ? 'bg-amber-950/30 text-amber-400 border-amber-500/20'
+                                : isEnabled ? 'bg-emerald-950/20 text-emerald-400 border-emerald-500/15'
+                                : 'bg-zinc-900 text-zinc-500 border-white/5'
+                              } uppercase`}>
+                                {isPast ? 'Pasado' : isEnabled ? 'Activo' : 'Oculto'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border ${
+                                turno.unidades_disponibles === 0
+                                  ? 'bg-red-950/20 text-red-400 border-red-500/15'
+                                  : 'bg-emerald-950/20 text-emerald-400 border-emerald-500/15'
+                              }`}>
+                                {turno.unidades_disponibles}/{turno.total_unidades}
+                              </span>
+                              <button
+                                onClick={() => handleDeleteTurno(turno.id, turno.hora)}
+                                className="w-7 h-7 rounded-lg border border-red-500/20 bg-red-950/10 text-red-400 hover:bg-red-950/40 flex items-center justify-center transition-all cursor-pointer"
+                                title="Eliminar turno"
+                              >
+                                <Trash className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Row 2: Duracion badge + toggle */}
+                          <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                            <div className="flex items-center gap-1.5 text-[10px] text-zinc-400">
+                              <Timer className="w-3 h-3 text-[#FF5500] shrink-0" />
+                              <span className="text-white font-bold">{durLabel}</span>
+                            </div>
+                            <button
+                              onClick={() => handleToggleTurno(turno.id, isEnabled)}
+                              disabled={isPast}
+                              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-bold transition-all cursor-pointer ${
+                                isPast
+                                  ? 'opacity-40 cursor-not-allowed border-white/5 text-zinc-600'
+                                  : isEnabled
+                                    ? 'border-emerald-500/30 bg-emerald-950/20 text-emerald-400 hover:bg-emerald-950/40'
+                                    : 'border-red-500/25 bg-red-950/15 text-red-400 hover:bg-red-950/30'
+                              }`}
+                            >
+                              {isEnabled ? <><ToggleRight className="w-4 h-4" /><span>ON</span></> : <><ToggleLeft className="w-4 h-4" /><span>OFF</span></>}
+                            </button>
+                          </div>
+
+                          {/* Row 3: Duration selector */}
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider block">Duración:</span>
+                            <div className="flex gap-1.5">
+                              {([1, 2, null] as (1 | 2 | null)[]).map(dur => (
+                                <button
+                                  key={String(dur)}
+                                  onClick={() => handleUpdateTurnoDuracion(turno.id, dur)}
+                                  className={`flex-1 h-7 text-[10px] font-bold rounded-lg border transition-all cursor-pointer ${
+                                    turno.duracion_horas === dur
+                                      ? 'bg-[#FF5500] border-[#FF5500] text-white shadow-[0_0_6px_rgba(255,85,0,0.3)]'
+                                      : 'bg-black/40 border-white/10 text-zinc-400 hover:bg-zinc-800 hover:text-white'
+                                  }`}
+                                >
+                                  {dur === 1 ? '1 h' : dur === 2 ? '2 h' : 'Día'}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Row 4: Capacity selector */}
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider block">Monopatines:</span>
+                            <div className="flex gap-1">
+                              {[0, 1, 2, 3, 4].map(num => (
+                                <button
+                                  key={num}
+                                  onClick={() => handleUpdateTurnoCapacity(turno.id, num)}
+                                  className={`flex-1 h-7 text-xs font-bold rounded-lg flex items-center justify-center border transition-all cursor-pointer ${
+                                    turno.total_unidades === num
+                                      ? 'bg-[#FF5500] border-[#FF5500] text-white shadow-[0_0_6px_rgba(255,85,0,0.3)]'
+                                      : num === 0
+                                        ? 'bg-red-950/20 border-red-500/15 text-red-400 hover:bg-red-950/40'
+                                        : 'bg-black/40 border-white/10 text-zinc-300 hover:bg-zinc-800'
+                                  }`}
+                                >
+                                  {num}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-
-              {turnos.length === 0 ? (
-                <div className="text-center text-xs text-zinc-500 py-12 border border-dashed border-white/10 rounded-2xl">
-                  No hay turnos para {selectedFecha.split("-").reverse().join("/")}. Los turnos se generan al crear la fecha en Supabase.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  {turnos.map((turno) => {
-                    const isToday = turno.fecha === new Date().toISOString().split("T")[0];
-                    const nowHHMM = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
-                    const isPast = isToday && turno.hora < nowHHMM;
-                    const isEnabled = turno.habilitado !== false;
-                    const durLabel = turno.duracion_horas === 2 ? "2 horas" : turno.duracion_horas === null ? "Día completo" : "1 hora";
-
-                    return (
-                      <div
-                        key={turno.id}
-                        className={`border rounded-2xl p-4 flex flex-col gap-3 transition-all ${
-                          isPast
-                            ? "border-amber-500/20 bg-amber-950/10 opacity-70"
-                            : isEnabled
-                              ? "border-emerald-500/20 bg-black/20"
-                              : "border-white/5 bg-black/10 opacity-55"
-                        }`}
-                      >
-                        {/* Header */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-base font-extrabold text-white font-mono">{turno.hora} hs</span>
-                            {isPast && (
-                              <span className="text-[9px] font-bold bg-amber-950/30 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-md uppercase">Pasado</span>
-                            )}
-                            {!isEnabled && !isPast && (
-                              <span className="text-[9px] font-bold bg-zinc-900 text-zinc-500 border border-white/5 px-2 py-0.5 rounded-md uppercase">Oculto</span>
-                            )}
-                          </div>
-                          <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border ${
-                            turno.unidades_disponibles === 0
-                              ? "bg-red-950/20 text-red-400 border-red-500/15"
-                              : "bg-emerald-950/20 text-emerald-400 border-emerald-500/15"
-                          }`}>
-                            {turno.unidades_disponibles}/{turno.total_unidades} libres
-                          </span>
-                        </div>
-
-                        {/* Duracion badge */}
-                        <div className="flex items-center gap-1.5 text-[10px] text-zinc-400">
-                          <Timer className="w-3 h-3 text-[#FF5500] shrink-0" />
-                          Duración actual: <span className="text-white font-bold ml-0.5">{durLabel}</span>
-                        </div>
-
-                        {/* Toggle habilitado */}
-                        <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Visibilidad clientes</span>
-                          <button
-                            onClick={() => handleToggleTurno(turno.id, isEnabled)}
-                            disabled={isPast}
-                            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border text-[10px] font-bold transition-all cursor-pointer ${
-                              isPast
-                                ? "opacity-40 cursor-not-allowed border-white/5 text-zinc-600"
-                                : isEnabled
-                                  ? "border-emerald-500/30 bg-emerald-950/20 text-emerald-400 hover:bg-emerald-950/40"
-                                  : "border-red-500/25 bg-red-950/15 text-red-400 hover:bg-red-950/30"
-                            }`}
-                          >
-                            {isEnabled
-                              ? <><ToggleRight className="w-4 h-4" /><span>ON</span></>
-                              : <><ToggleLeft className="w-4 h-4" /><span>OFF</span></>
-                            }
-                          </button>
-                        </div>
-
-                        {/* Duracion selector */}
-                        <div className="space-y-1.5">
-                          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Duración del turno:</span>
-                          <div className="flex gap-1.5">
-                            {([1, 2, null] as (1 | 2 | null)[]).map((dur) => (
-                              <button
-                                key={String(dur)}
-                                onClick={() => handleUpdateTurnoDuracion(turno.id, dur)}
-                                className={`flex-1 h-8 text-[11px] font-bold rounded-lg border transition-all cursor-pointer ${
-                                  turno.duracion_horas === dur
-                                    ? "bg-[#FF5500] border-[#FF5500] text-white shadow-[0_0_8px_rgba(255,85,0,0.35)]"
-                                    : "bg-black/40 border-white/10 text-zinc-400 hover:bg-zinc-800 hover:text-white"
-                                }`}
-                              >
-                                {dur === 1 ? "1 h" : dur === 2 ? "2 h" : "Día"}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Capacidad selector */}
-                        <div className="space-y-1.5">
-                          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Monopatines disponibles:</span>
-                          <div className="flex gap-1">
-                            {[0, 1, 2, 3, 4].map((num) => (
-                              <button
-                                key={num}
-                                onClick={() => handleUpdateTurnoCapacity(turno.id, num)}
-                                className={`flex-1 h-8 text-xs font-bold rounded-lg flex items-center justify-center border transition-all cursor-pointer ${
-                                  turno.total_unidades === num
-                                    ? "bg-[#FF5500] border-[#FF5500] text-white shadow-[0_0_8px_rgba(255,85,0,0.4)]"
-                                    : num === 0
-                                      ? "bg-red-950/20 border-red-500/15 text-red-400 hover:bg-red-950/40"
-                                      : "bg-black/40 border-white/10 text-zinc-300 hover:bg-zinc-800"
-                                }`}
-                              >
-                                {num}
-                              </button>
-                            ))}
-                          </div>
-                          <p className="text-[9px] text-zinc-600">Seleccionar 0 inhabilita automáticamente</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
             </div>
           )}
 
