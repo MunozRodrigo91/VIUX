@@ -146,6 +146,87 @@ export default function App() {
       fetchConfirmedReserva();
     }
 
+    // --- Manejo de back_urls reales de MercadoPago Checkout Pro ---
+    const paymentStatus = params.get("payment");
+    const mpExternalRef = params.get("external_reference");
+
+    if (paymentStatus === "success" && mpExternalRef) {
+      // Pago aprobado: actualizar estado en Supabase y mostrar ticket
+      const handleMpSuccess = async () => {
+        try {
+          // Marcar la reserva como seña_pagada si aún no lo está
+          await supabase
+            .from('reservas')
+            .update({ estado_pago: 'seña_pagada' })
+            .eq('id', mpExternalRef)
+            .eq('estado_pago', 'pendiente'); // Solo actualizar si estaba pendiente
+
+          // Intentar registrar la transacción en la caja abierta
+          const today = new Date().toISOString().split("T")[0];
+          const { data: cajaData } = await supabase
+            .from('cajas')
+            .select('*')
+            .eq('fecha', today)
+            .eq('estado', 'abierta')
+            .single();
+
+          const { data: reservaData, error: reservaError } = await supabase
+            .from('reservas')
+            .select('*')
+            .eq('id', mpExternalRef)
+            .single();
+
+          if (cajaData && reservaData) {
+            const txId = Math.floor(Math.random() * 100000000);
+            await supabase
+              .from('transacciones')
+              .insert({
+                id: txId,
+                caja_id: cajaData.id,
+                reserva_id: mpExternalRef,
+                tipo: 'ingreso_seña_mp',
+                monto: reservaData.monto_seña,
+                descripcion: `Ingreso Seña MP Checkout Pro — ${reservaData.nombre_cliente} (${mpExternalRef})`
+              });
+          }
+
+          if (!reservaError && reservaData) {
+            posthog.capture('booking_payment_approved_mp', {
+              reserva_id: mpExternalRef,
+              monto_sena: reservaData.monto_seña,
+            });
+            setCurrentReserva(reservaData as unknown as Reserva);
+            setCurrentStep(5);
+            setStartedBooking(true);
+            setNotification({
+              message: `¡Pago aprobado por MercadoPago! Se cobró la seña de $${reservaData.monto_seña?.toLocaleString("es-AR")} con éxito.`,
+              type: "success"
+            });
+          }
+        } catch (err) {
+          setNotification({
+            message: "El pago fue aprobado pero no pudimos cargar el ticket. Contactanos por WhatsApp.",
+            type: "error"
+          });
+        }
+      };
+      handleMpSuccess();
+
+    } else if (paymentStatus === "failure" && mpExternalRef) {
+      posthog.capture('booking_payment_failed_mp', { reserva_id: mpExternalRef });
+      setNotification({
+        message: "El pago de la seña no pudo completarse. Podés intentar de nuevo desde el inicio.",
+        type: "error"
+      });
+
+    } else if (paymentStatus === "pending" && mpExternalRef) {
+      posthog.capture('booking_payment_pending_mp', { reserva_id: mpExternalRef });
+      setNotification({
+        message: `Tu pago está pendiente de acreditación (Reserva: ${mpExternalRef}). Te notificaremos cuando se confirme.`,
+        type: "info" as any
+      });
+    }
+
     const failedId = params.get("reserva_fallida");
     if (failedId) {
       posthog.capture('booking_payment_failed', { reserva_id: failedId });

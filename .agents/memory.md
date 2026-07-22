@@ -1,5 +1,5 @@
 # VIUX — Memory del Proyecto
-> Última actualización: 2026-07-21
+> Última actualización: 2026-07-22
 
 ## ⚠️ BUG CONOCIDO RESUELTO: Recursión infinita en RLS de `profiles`
 - La política `"Admin total sobre perfiles"` consultaba `profiles` para verificar si el usuario era admin → loop infinito
@@ -16,7 +16,7 @@
 | Backend | Prescindido (Supabase SDK directo en frontend) | ✅ ELIMINADO / DIRECTO |
 | Persistencia | Supabase PostgreSQL Remoto | ✅ ACTIVO |
 | Realtime | Supabase Realtime Channels (Postgres changes) | ✅ ACTIVO |
-| Pagos | MercadoPago (simulado con impacto de caja) | ⚠️ SIMULADO |
+| Pagos | MercadoPago Checkout Pro **REAL** (Edge Function + SDK) | ✅ INTEGRADO |
 | PWA | manifest.json + sw.js | ✅ CONFIGURADO (faltan iconos) |
 | DB Supabase | PostgreSQL / RLS y roles configurados | ✅ COMPLETO |
 | Auth Admin | Integrado con auth.users + profiles | ✅ COMPLETO |
@@ -27,9 +27,9 @@
 
 | Archivo | Función | Estado |
 |---|---|---|
-| `src/App.tsx` | Router principal, lógica de auth admin, SSE listener | ✅ |
+| `src/App.tsx` | Router principal + manejo back_urls MP (`?payment=success/failure/pending`) | ✅ |
 | `src/components/LandingPage.tsx` | Página de inicio pública (28KB) | ✅ |
-| `src/components/PublicBooking.tsx` | Flujo de reserva cliente (35KB) | ✅ |
+| `src/components/PublicBooking.tsx` | Flujo de reserva cliente — Step 4 con MP Checkout Pro real | ✅ |
 | `src/components/AdminPanel.tsx` | Panel admin + Analytics + Caja (69KB — el más grande) | ✅ |
 | `src/components/TicketView.tsx` | Ticket post-pago de la reserva | ✅ |
 | `src/components/ProgressIndicator.tsx` | Indicador de pasos del flujo | ✅ |
@@ -57,7 +57,16 @@
 | POST | `/api/caja/ingreso` | Ingreso manual |
 | POST | `/api/caja/gasto` | Gasto manual |
 | GET | `/api/events` | SSE stream de actualizaciones |
-| GET/POST | `/api/mercadopago/*` | Webhook/simulación de pagos |
+| GET/POST | `/api/mercadopago/*` | Webhook/simulación de pagos (legacy) |
+
+---
+
+## Edge Functions Supabase
+
+| Función | Descripción | Estado |
+|---|---|---|
+| `validate-booking` | Crea reserva atómicamente en DB | ✅ ACTIVA |
+| `create-mp-preference` | Genera preferencia real MP Checkout Pro (30% seña) | ✅ ACTIVA |
 
 ---
 
@@ -100,6 +109,14 @@
 - [x] Quitar demo credentials de UI y crear Admin User seguro en auth.users
 - [ ] Agregar iconos PWA (icon-192.png y icon-512.png)
 - [x] Deploy en producción (Vercel / Netlify + Supabase)
+- [x] **Integración MercadoPago Checkout Pro REAL (2026-07-22)**:
+    - Nueva Edge Function `create-mp-preference` deployada en Supabase
+    - Secrets `MP_ACCESS_TOKEN` y `APP_URL` configurados en Supabase
+    - SDK oficial de MP cargado desde CDN en `index.html`
+    - Step 4 del flujo de reserva usa SDK real con botón MP oficial
+    - back_urls configuradas: `?payment=success/failure/pending&external_reference=reserva_id`
+    - `App.tsx` maneja las 3 back_urls de retorno y actualiza estado en Supabase
+    - Botón de aprobación directa conservado para demos internas
 
 ---
 

@@ -41,11 +41,65 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
   const [loadingBooking, setLoadingBooking] = useState<boolean>(false);
   const [bookingError, setBookingError] = useState<string>("");
   const [createdReserva, setCreatedReserva] = useState<Reserva | null>(null);
-  const [mpCheckoutUrl, setMpCheckoutUrl] = useState<string>("");
+  const [mpPreferenceId, setMpPreferenceId] = useState<string>("");
+  const [mpLoading, setMpLoading] = useState<boolean>(false);
+  const [mpError, setMpError] = useState<string>("");
 
   useEffect(() => {
     onStepChange(step);
   }, [step, onStepChange]);
+
+  // Cuando llega al step 4, crea la preferencia real de MP y monta el botón Checkout Pro
+  useEffect(() => {
+    if (step !== 4 || !createdReserva) return;
+
+    let isMounted = true;
+    setMpLoading(true);
+    setMpError("");
+
+    const initMercadoPago = async () => {
+      try {
+        // 1. Llamar a la Edge Function para crear la preferencia real
+        const { data, error } = await supabase.functions.invoke('create-mp-preference', {
+          body: { reserva_id: createdReserva.id }
+        });
+
+        if (error || !data?.success) {
+          throw new Error(error?.message || data?.error || "Error al crear la preferencia de pago.");
+        }
+
+        if (!isMounted) return;
+
+        setMpPreferenceId(data.preference_id);
+
+        // 2. Inicializar el SDK de MercadoPago (inyectado globalmente desde index.html)
+        const mpPublicKey = import.meta.env.VITE_MP_PUBLIC_KEY;
+        if (!mpPublicKey) {
+          throw new Error("VITE_MP_PUBLIC_KEY no configurada en el entorno.");
+        }
+
+        const mp = new (window as any).MercadoPago(mpPublicKey, { locale: 'es-AR' });
+
+        // 3. Montar el botón oficial en el contenedor #mp-checkout-btn
+        mp.checkout({
+          preference: { id: data.preference_id },
+          render: {
+            container: '#mp-checkout-btn',
+            label: `Pagar Seña $${createdReserva.monto_seña?.toLocaleString('es-AR')} con MercadoPago`,
+          }
+        });
+
+      } catch (err: any) {
+        console.error("Error inicializando MercadoPago:", err);
+        if (isMounted) setMpError(err.message || "Error al preparar el pago.");
+      } finally {
+        if (isMounted) setMpLoading(false);
+      }
+    };
+
+    initMercadoPago();
+    return () => { isMounted = false; };
+  }, [step, createdReserva]);
 
   useEffect(() => {
     fetchTurnos();
@@ -190,7 +244,6 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
       }
 
       setCreatedReserva(dbReserva as unknown as Reserva);
-      setMpCheckoutUrl(`https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=pref_${createdId}`);
       posthog.capture('booking_payment_step_reached', {
         reserva_id: createdId,
         monto_sena: (dbReserva as any).monto_seña,
@@ -789,7 +842,7 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
           </motion.div>
         )}
 
-        {/* STEP 4: MERCADO PAGO PORTAL / WEBHOOK LAUNCH */}
+        {/* STEP 4: MERCADO PAGO CHECKOUT PRO */}
         {step === 4 && createdReserva && (
           <motion.div
             key="step4"
@@ -799,65 +852,100 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
             transition={{ duration: 0.2 }}
             className="space-y-6"
           >
+            {/* Header */}
             <div className="text-center">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-[#FF5500]/10 border border-[#FF5500]/30 text-[#FF5500] mb-3 neon-orange-glow">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-[#009EE3]/10 border border-[#009EE3]/30 text-[#009EE3] mb-3">
                 <CreditCard className="w-6 h-6" />
               </div>
               <h1 className="text-xl font-display font-extrabold text-white tracking-tight uppercase">Pago Seguro de Seña</h1>
               <p className="text-xs text-zinc-400 mt-1.5 leading-relaxed font-light">
-                Completá el cobro de la seña para activar tu ticket digital de alquiler.
+                Pagá el 30% de seña para activar tu ticket digital de alquiler.
               </p>
             </div>
 
-            <div className="glass-card rounded-xl p-5 space-y-4 border border-white/10">
-              <div className="flex justify-between items-center pb-2.5 border-b border-white/10">
-                <span className="text-xs text-zinc-400">Monto de la Seña:</span>
+            {/* Monto resumen */}
+            <div className="glass-card rounded-xl p-5 space-y-3 border border-white/10">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-zinc-400">Reserva:</span>
+                <span className="text-xs text-zinc-300 font-mono">{createdReserva.id}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-zinc-400">Fecha y hora:</span>
+                <span className="text-xs text-white font-semibold">{createdReserva.fecha_turno} a las {createdReserva.hora_turno}hs</span>
+              </div>
+              <div className="flex justify-between items-center pb-2 border-b border-white/10">
+                <span className="text-xs text-zinc-400">Monopatines:</span>
+                <span className="text-xs text-white font-semibold">{createdReserva.cantidad_monopatines} unidad(es)</span>
+              </div>
+              <div className="flex justify-between items-center pt-1">
+                <span className="text-sm font-bold text-white">Seña a pagar (30%):</span>
                 <span className="text-xl font-mono font-black text-[#FF5500] bg-[#FF5500]/10 px-3 py-1 rounded-md border border-[#FF5500]/20 neon-orange-text">
-                  ${montoSeña.toLocaleString("es-AR")}
+                  ${createdReserva.monto_seña?.toLocaleString("es-AR")}
                 </span>
               </div>
+            </div>
 
-              <div className="text-xs text-zinc-400 leading-relaxed space-y-2 font-light">
-                <p>
-                  Para confirmar tu reserva, debés abonar la seña utilizando <strong>MercadoPago Checkout Pro</strong>.
-                </p>
-                <p>
-                  Una vez aprobada, el sistema te redirigirá automáticamente a tu ticket digital de alquiler.
-                </p>
+            {/* Estado de carga / error de MP */}
+            {mpLoading && (
+              <div className="flex flex-col items-center justify-center py-8 space-y-3 bg-white/5 border border-white/10 rounded-xl">
+                <RefreshCw className="w-7 h-7 text-[#009EE3] animate-spin" />
+                <span className="text-xs text-zinc-400">Preparando Mercado Pago Checkout Pro...</span>
               </div>
-            </div>
+            )}
 
-            <div className="space-y-3">
-              <a
-                href={mpCheckoutUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => posthog.capture('booking_mercadopago_clicked', {
-                  reserva_id: createdReserva?.id,
-                  monto_sena: createdReserva?.monto_seña,
-                  partner: partner || null,
-                })}
-                className="w-full h-12 bg-[#009EE3] text-white rounded-lg font-bold flex items-center justify-center space-x-2 hover:bg-[#0084c0] active:scale-[0.99] transition-all text-decoration-none text-sm shadow-sm uppercase tracking-wider"
-              >
-                <span>Pagar con MercadoPago (Simulador)</span>
-                <ArrowRight className="w-4 h-4" />
-              </a>
+            {mpError && (
+              <div className="bg-red-500/10 border border-red-500/25 text-red-400 text-xs p-3.5 rounded-lg flex items-start space-x-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
+                <div>
+                  <p className="font-bold mb-1">Error al preparar el pago con MercadoPago:</p>
+                  <p className="font-light">{mpError}</p>
+                  <p className="mt-2 text-zinc-500">Podés usar el botón alternativo de abajo para aprobar la reserva directamente.</p>
+                </div>
+              </div>
+            )}
 
-              <button
-                onClick={handleSimulateInstantPayment}
-                disabled={loadingBooking}
-                className="w-full h-12 border border-[#FF5500] text-[#FF5500] bg-[#FF5500]/5 hover:bg-[#FF5500]/10 rounded-lg font-bold flex items-center justify-center space-x-2 active:scale-[0.99] transition-all cursor-pointer text-sm uppercase tracking-wider neon-orange-glow"
-              >
-                {loadingBooking ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : (
-                  <span>Aprobación Directa (Sin Redirigir)</span>
-                )}
-              </button>
-            </div>
+            {/* Contenedor del botón oficial de MercadoPago Checkout Pro */}
+            {!mpLoading && !mpError && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 text-center">Pago seguro procesado por</p>
+                {/* El SDK de MP inyecta el botón aquí automáticamente */}
+                <div
+                  id="mp-checkout-btn"
+                  className="w-full"
+                  onClick={() => posthog.capture('booking_mercadopago_clicked', {
+                    reserva_id: createdReserva?.id,
+                    preference_id: mpPreferenceId,
+                    monto_sena: createdReserva?.monto_seña,
+                    partner: partner || null,
+                  })}
+                />
+              </div>
+            )}
 
-            <div className="text-[10px] text-center text-zinc-400 glass-card rounded-xl p-4.5 leading-relaxed shadow-sm border border-white/5 font-light">
-              💡 <strong>Sugerencia de pruebas:</strong> El botón celeste abre una simulación interactiva de MercadoPago en pestaña nueva, mientras que el botón inferior simula el pago aprobado al instante en esta pantalla.
+            {/* Separador */}
+            {!mpLoading && (
+              <div className="flex items-center space-x-3">
+                <div className="flex-1 h-px bg-white/10" />
+                <span className="text-[10px] text-zinc-500 uppercase tracking-wider">o bien</span>
+                <div className="flex-1 h-px bg-white/10" />
+              </div>
+            )}
+
+            {/* Botón de aprobación directa (sin redirigir — para testing interno) */}
+            <button
+              onClick={handleSimulateInstantPayment}
+              disabled={loadingBooking || mpLoading}
+              className="w-full h-11 border border-[#FF5500]/50 text-[#FF5500]/80 bg-[#FF5500]/5 hover:bg-[#FF5500]/10 rounded-lg font-bold flex items-center justify-center space-x-2 active:scale-[0.99] transition-all cursor-pointer text-xs uppercase tracking-wider disabled:opacity-40"
+            >
+              {loadingBooking ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <span>⚡ Aprobar Seña Directamente (Sin Redirigir)</span>
+              )}
+            </button>
+
+            <div className="text-[10px] text-center text-zinc-500 leading-relaxed font-light">
+              El botón superior usa <strong className="text-zinc-400">MercadoPago Checkout Pro</strong> real. El botón inferior confirma la reserva al instante sin pasar por MP (útil para demos internas).
             </div>
           </motion.div>
         )}
