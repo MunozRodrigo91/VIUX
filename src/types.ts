@@ -34,7 +34,8 @@ export interface Reserva {
   email_cliente: string;
   cantidad_monopatines: number;
   monto_total: number;
-  monto_seña: number; // 30%
+  monto_sena: number; // 30% — columna real en Supabase
+  monto_seña?: number; // alias legacy (server.ts local)
   monto_saldo: number; // 70%
   monto_garantia: number; // Reembolsable
   estado_pago: EstadoPago;

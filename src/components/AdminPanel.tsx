@@ -154,7 +154,7 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
             if (!statsMap[r.partner]) statsMap[r.partner] = { count: 0, total: 0 };
             statsMap[r.partner].count += 1;
             if (r.estado_pago === 'seña_pagada') {
-              statsMap[r.partner].total += r.monto_seña;
+              statsMap[r.partner].total += r.monto_sena;
             }
             if (r.estado_reserva === 'check_in' || r.estado_reserva === 'check_out') {
               statsMap[r.partner].total += r.monto_saldo;
@@ -681,7 +681,7 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
       r.email_cliente,
       r.cantidad_monopatines,
       r.monto_total,
-      r.monto_seña,
+      r.monto_sena,
       r.monto_saldo,
       r.monto_garantia,
       r.estado_pago,
@@ -711,7 +711,7 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
   const tasaConversion = totalReservasCount > 0 ? Math.round((totalPagadasCount / totalReservasCount) * 100) : 0;
   
   // Money
-  const totalSenaOnline = reservasPagadas.reduce((sum, r) => sum + r.monto_seña, 0);
+  const totalSenaOnline = reservasPagadas.reduce((sum, r) => sum + r.monto_sena, 0);
   const totalSaldoPresencial = reservasPagadas
     .filter(r => ["check_in", "check_out"].includes(r.estado_reserva))
     .reduce((sum, r) => sum + r.monto_saldo, 0);
@@ -987,7 +987,7 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
                               </div>
                               <div className="flex justify-between">
                                 <span>Seña MP (30%):</span>
-                                <span className="text-white">${reserva.monto_seña.toLocaleString("es-AR")}</span>
+                                <span className="text-white">${reserva.monto_sena.toLocaleString("es-AR")}</span>
                               </div>
                               <div className="flex justify-between">
                                 <span className={isCreated ? "font-bold text-[#FF5500]" : ""}>

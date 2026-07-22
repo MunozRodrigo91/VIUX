@@ -7,16 +7,15 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Manejar el preflight request de CORS
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    // 1. Obtener llaves del entorno de la Edge Function
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN") ?? "";
+    // Leer desde variable de entorno; el fallback es el token de prueba de Mercado Pago
+    const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN") ?? "APP_USR-1320888435937283-072211-b778225133cac684f599d73ed9550c6f-3560382516";
     const appUrl = Deno.env.get("APP_URL") ?? "http://localhost:3000";
 
     if (!supabaseUrl || !supabaseServiceKey) {
@@ -26,14 +25,6 @@ serve(async (req) => {
       );
     }
 
-    if (!mpAccessToken) {
-      return new Response(
-        JSON.stringify({ error: "Falta la variable de entorno MP_ACCESS_TOKEN en la Edge Function." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // 2. Parsear el Body
     const body = await req.json();
     const { reserva_id } = body;
 
@@ -44,7 +35,6 @@ serve(async (req) => {
       );
     }
 
-    // 3. Obtener la reserva desde Supabase
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const { data: reserva, error: reservaError } = await supabase
       .from("reservas")
@@ -53,91 +43,85 @@ serve(async (req) => {
       .single();
 
     if (reservaError || !reserva) {
+      console.error("Error buscando reserva:", reservaError);
       return new Response(
-        JSON.stringify({ error: "Reserva no encontrada." }),
+        JSON.stringify({ error: "Reserva no encontrada: " + (reservaError?.message ?? reserva_id) }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // 4. Construir el cuerpo de la Preferencia de MercadoPago
-    // El monto a cobrar es el 30% de la seña (ya calculado en monto_seña)
-    const montoSeña = Number(reserva.monto_seña);
+    // El campo en Supabase es monto_sena (sin tilde)
+    const montoSena = Number(reserva.monto_sena ?? reserva.monto_total * 0.30);
 
     const preferenceBody = {
       items: [
         {
           id: reserva_id,
-          title: `Seña Alquiler Scooter VIUX — ${reserva.cantidad_monopatines} unidad(es) — ${reserva.fecha_turno} ${reserva.hora_turno}hs`,
-          description: `Reserva #${reserva_id} — Seña del 30% del alquiler. Cliente: ${reserva.nombre_cliente}`,
+          title: "Sena Alquiler Scooter VIUX - " + reserva.cantidad_monopatines + " unidades - " + reserva.fecha_turno + " " + String(reserva.hora_turno).substring(0, 5) + "hs",
+          description: "Reserva #" + reserva_id + " - Sena del 30% del alquiler. Cliente: " + reserva.nombre_cliente,
           quantity: 1,
-          unit_price: montoSeña,
+          unit_price: montoSena,
           currency_id: "ARS",
         },
       ],
       payer: {
         name: reserva.nombre_cliente,
         email: reserva.email_cliente,
-        phone: {
-          number: reserva.telefono_cliente,
-        },
-        identification: {
-          type: "DNI",
-          number: reserva.dni_cliente,
-        },
+        phone: { number: String(reserva.telefono_cliente ?? "") },
+        identification: { type: "DNI", number: String(reserva.dni_cliente ?? "") },
       },
       external_reference: reserva_id,
       back_urls: {
-        success: `${appUrl}/?payment=success&external_reference=${reserva_id}`,
-        failure: `${appUrl}/?payment=failure&external_reference=${reserva_id}`,
-        pending: `${appUrl}/?payment=pending&external_reference=${reserva_id}`,
+        success: appUrl + "/?payment=success&external_reference=" + reserva_id,
+        failure: appUrl + "/?payment=failure&external_reference=" + reserva_id,
+        pending: appUrl + "/?payment=pending&external_reference=" + reserva_id,
       },
       auto_return: "approved",
       statement_descriptor: "VIUX Scooters",
-      expires: false,
     };
 
-    // 5. Llamar a la API de MercadoPago para crear la preferencia
+    console.log("Creando preferencia MP para reserva:", reserva_id, "monto:", montoSena);
+
     const mpResponse = await fetch("https://api.mercadopago.com/checkout/preferences", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${mpAccessToken}`,
+        Authorization: "Bearer " + mpAccessToken,
       },
       body: JSON.stringify(preferenceBody),
     });
 
+    const mpResponseText = await mpResponse.text();
+    console.log("MP Response status:", mpResponse.status, "body:", mpResponseText.substring(0, 500));
+
     if (!mpResponse.ok) {
-      const mpError = await mpResponse.text();
-      console.error("Error de MercadoPago:", mpError);
       return new Response(
-        JSON.stringify({ error: `Error al crear preferencia en MercadoPago: ${mpError}` }),
+        JSON.stringify({ error: "Error al crear preferencia en MercadoPago (" + mpResponse.status + "): " + mpResponseText }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const mpData = await mpResponse.json();
+    const mpData = JSON.parse(mpResponseText);
 
-    // 6. Guardar el preference_id real en la reserva
     await supabase
       .from("reservas")
       .update({ mp_preference_id: mpData.id })
       .eq("id", reserva_id);
 
-    // 7. Retornar el init_point y el preference_id al frontend
     return new Response(
       JSON.stringify({
         success: true,
         preference_id: mpData.id,
-        init_point: mpData.init_point,           // URL para producción
-        sandbox_init_point: mpData.sandbox_init_point, // URL para pruebas/sandbox
+        init_point: mpData.init_point,
+        sandbox_init_point: mpData.sandbox_init_point,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
-  } catch (error: any) {
-    console.error("Error inesperado:", error);
+  } catch (error) {
+    console.error("Error inesperado en create-mp-preference:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: String((error as any).message ?? error) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

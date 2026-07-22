@@ -152,7 +152,7 @@ export default function TicketView({ reserva, onBackToStart }: TicketViewProps) 
               <CreditCard className="w-3.5 h-3.5 mr-1 text-[#FF5500]" /> Seña Online MP (30%):
             </span>
             <span className="font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/25">
-              ${reserva.monto_seña.toLocaleString("es-AR")} (PAGADA)
+              ${reserva.monto_sena.toLocaleString("es-AR")} (PAGADA)
             </span>
           </div>
 

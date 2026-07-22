@@ -85,7 +85,7 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
           preference: { id: data.preference_id },
           render: {
             container: '#mp-checkout-btn',
-            label: `Pagar Seña $${createdReserva.monto_seña?.toLocaleString('es-AR')} con MercadoPago`,
+            label: `Pagar Seña $${createdReserva.monto_sena?.toLocaleString('es-AR')} con MercadoPago`,
           }
         });
 
@@ -246,7 +246,7 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
       setCreatedReserva(dbReserva as unknown as Reserva);
       posthog.capture('booking_payment_step_reached', {
         reserva_id: createdId,
-        monto_sena: (dbReserva as any).monto_seña,
+        monto_sena: (dbReserva as any).monto_sena,
         delivery_mode: deliveryMode,
         partner: partner || null,
       });
@@ -264,7 +264,7 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
     if (!createdReserva) return;
     posthog.capture('booking_payment_simulated', {
       reserva_id: createdReserva.id,
-      monto_sena: createdReserva.monto_seña,
+      monto_sena: createdReserva.monto_sena,
       partner: partner || null,
     });
     setLoadingBooking(true);
@@ -296,7 +296,7 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
             caja_id: cajaData.id,
             reserva_id: createdReserva.id,
             tipo: 'ingreso_seña_mp',
-            monto: createdReserva.monto_seña,
+            monto: createdReserva.monto_sena,
             descripcion: `Ingreso Seña MP - ${createdReserva.nombre_cliente} (${createdReserva.id})`
           });
       }
@@ -880,7 +880,7 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
               <div className="flex justify-between items-center pt-1">
                 <span className="text-sm font-bold text-white">Seña a pagar (30%):</span>
                 <span className="text-xl font-mono font-black text-[#FF5500] bg-[#FF5500]/10 px-3 py-1 rounded-md border border-[#FF5500]/20 neon-orange-text">
-                  ${createdReserva.monto_seña?.toLocaleString("es-AR")}
+                  ${createdReserva.monto_sena?.toLocaleString("es-AR")}
                 </span>
               </div>
             </div>
@@ -915,7 +915,7 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
                   onClick={() => posthog.capture('booking_mercadopago_clicked', {
                     reserva_id: createdReserva?.id,
                     preference_id: mpPreferenceId,
-                    monto_sena: createdReserva?.monto_seña,
+                    monto_sena: createdReserva?.monto_sena,
                     partner: partner || null,
                   })}
                 />

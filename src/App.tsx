@@ -130,7 +130,7 @@ export default function App() {
             setCurrentStep(5); // Render step 5 ticket
             setStartedBooking(true); // Bypass landing
             setNotification({
-              message: `¡Seña de $${data.monto_seña.toLocaleString("es-AR")} cobrada con éxito! Tu reserva está activa.`,
+              message: `¡Seña de $${data.monto_sena.toLocaleString("es-AR")} cobrada con éxito! Tu reserva está activa.`,
               type: "success"
             });
           } else {
@@ -185,7 +185,7 @@ export default function App() {
                 caja_id: cajaData.id,
                 reserva_id: mpExternalRef,
                 tipo: 'ingreso_seña_mp',
-                monto: reservaData.monto_seña,
+                monto: reservaData.monto_sena,
                 descripcion: `Ingreso Seña MP Checkout Pro — ${reservaData.nombre_cliente} (${mpExternalRef})`
               });
           }
@@ -193,13 +193,13 @@ export default function App() {
           if (!reservaError && reservaData) {
             posthog.capture('booking_payment_approved_mp', {
               reserva_id: mpExternalRef,
-              monto_sena: reservaData.monto_seña,
+              monto_sena: reservaData.monto_sena,
             });
             setCurrentReserva(reservaData as unknown as Reserva);
             setCurrentStep(5);
             setStartedBooking(true);
             setNotification({
-              message: `¡Pago aprobado por MercadoPago! Se cobró la seña de $${reservaData.monto_seña?.toLocaleString("es-AR")} con éxito.`,
+              message: `¡Pago aprobado por MercadoPago! Se cobró la seña de $${reservaData.monto_sena?.toLocaleString("es-AR")} con éxito.`,
               type: "success"
             });
           }
@@ -266,7 +266,7 @@ export default function App() {
       reserva_id: reserva.id,
       cantidad_monopatines: reserva.cantidad_monopatines,
       monto_total: reserva.monto_total,
-      monto_sena: reserva.monto_seña,
+      monto_sena: reserva.monto_sena,
       delivery_mode: reserva.delivery_mode,
       partner: reserva.partner || null,
       fecha_turno: reserva.fecha_turno,

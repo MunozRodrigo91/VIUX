@@ -6,6 +6,16 @@
 - Solución: reemplazada por `(auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'`
 - También se corrigió el campo login: de texto libre a `type="email"` (evitaba confusión de credenciales)
 
+## ⚠️ BUG CONOCIDO RESUELTO: Mismatch campo monto_seña / monto_sena (2026-07-22)
+- La DB de Supabase tiene la columna `monto_sena` (sin ñ), pero el tipo `Reserva` definía `monto_seña` (con ñ)
+- Esto causaba: panel admin en negro + crash en TicketView + datos undefined en el flujo de pago
+- Solución: `types.ts` actualizado → `monto_sena` es el campo principal, `monto_seña` queda como alias opcional (legacy para server.ts)
+- Archivos corregidos: `types.ts`, `App.tsx`, `AdminPanel.tsx`, `PublicBooking.tsx`, `TicketView.tsx`, `server.ts`
+
+## ⚠️ BUG CONOCIDO RESUELTO: validate-booking no estaba deployada en Supabase (2026-07-22)
+- La Edge Function existía localmente pero nunca fue subida → 404 al intentar reservar
+- Solución: deployada via MCP de Supabase, ACTIVA
+
 ---
 
 ## Arquitectura Actual
@@ -65,7 +75,7 @@
 
 | Función | Descripción | Estado |
 |---|---|---|
-| `validate-booking` | Crea reserva atómicamente en DB | ✅ ACTIVA |
+| `validate-booking` | Crea reserva atómicamente en DB | ✅ ACTIVA (deployada 2026-07-22) |
 | `create-mp-preference` | Genera preferencia real MP Checkout Pro (30% seña) | ✅ ACTIVA |
 
 ---
