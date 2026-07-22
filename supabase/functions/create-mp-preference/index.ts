@@ -12,11 +12,14 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     // Leer desde variable de entorno; el fallback es el token de prueba de Mercado Pago
-    const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN") ?? "APP_USR-1320888435937283-072211-b778225133cac684f599d73ed9550c6f-3560382516";
-    const appUrl = Deno.env.get("APP_URL") ?? "http://localhost:3000";
+    const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN") || "APP_USR-1320888435937283-072211-b778225133cac684f599d73ed9550c6f-3560382516";
+    let appUrl = Deno.env.get("APP_URL") || "";
+    if (appUrl.trim() === "") {
+      appUrl = "http://localhost:3000";
+    }
 
     if (!supabaseUrl || !supabaseServiceKey) {
       return new Response(
@@ -76,7 +79,9 @@ serve(async (req) => {
         failure: appUrl + "/?payment=failure&external_reference=" + reserva_id,
         pending: appUrl + "/?payment=pending&external_reference=" + reserva_id,
       },
-      auto_return: "approved",
+      // auto_return solo es aceptado por MP si las back_urls son válidas (HTTPS).
+      // Si usamos localhost en http, MP las ignora y tira error 400 si exigimos auto_return.
+      auto_return: appUrl.startsWith("https") ? "approved" : undefined,
       statement_descriptor: "VIUX Scooters",
     };
 

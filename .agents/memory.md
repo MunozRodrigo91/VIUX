@@ -12,6 +12,11 @@
 - Solución: `types.ts` actualizado → `monto_sena` es el campo principal, `monto_seña` queda como alias opcional (legacy para server.ts)
 - Archivos corregidos: `types.ts`, `App.tsx`, `AdminPanel.tsx`, `PublicBooking.tsx`, `TicketView.tsx`, `server.ts`
 
+## ⚠️ BUG CONOCIDO RESUELTO: MercadoPago rechaza "auto_return" en local (2026-07-22)
+- MP tiraba 400 (`auto_return invalid. back_url.success must be defined`) cuando la URL de retorno era HTTP (`http://localhost`).
+- MP requiere estrictamente HTTPS para procesar el auto_return, de lo contrario ignora completamente las `back_urls`.
+- Solución: Se actualizó la Edge Function `create-mp-preference` para enviar `auto_return: "approved"` **solo si** la `APP_URL` comienza con `https`.
+
 ## ⚠️ BUG CONOCIDO RESUELTO: validate-booking no estaba deployada en Supabase (2026-07-22)
 - La Edge Function existía localmente pero nunca fue subida → 404 al intentar reservar
 - Solución: deployada via MCP de Supabase, ACTIVA
