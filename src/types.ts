@@ -42,7 +42,7 @@ export interface Reserva {
   partner?: string; // Hotel/partner tracker
   delivery_mode?: 'meeting_point' | 'hotel_delivery'; // Delivery mode
   nombre_hotel?: string;
-  punto_encuentro_zona?: 'Pinamar' | 'Mar de Ostende' | 'Valeria del mar' | 'Carilo';
+  punto_encuentro_zona?: 'Pinamar' | 'Mar de Ostende' | 'Valeria del mar';
   mp_preference_id?: string;
   duracion_horas: DuracionTurno; // Chosen by customer: 1, 2, or null
   created_at: string;

@@ -35,11 +35,6 @@ export default function LandingPage({ partner, onStartBooking }: LandingPageProp
       title: "Valeria del Mar",
       desc: "Calles arboladas y tranquilas, con puntos de encuentro flexibles cerca de la rotonda de ingreso y la costanera para un retiro súper cómodo.",
       paths: "Zonas de baja velocidad linderas a centros comerciales y playas."
-    },
-    carilo: {
-      title: "Cariló",
-      desc: "La combinación perfecta de bosque y sustentabilidad. Coordinamos entregas en accesos peatonales y centros comerciales respetando el silencio y cuidado natural.",
-      paths: "Senderos consolidados aptos para monopatines eléctricos de última generación."
     }
   };
 
@@ -179,7 +174,7 @@ export default function LandingPage({ partner, onStartBooking }: LandingPageProp
             <div className="text-xs font-bold uppercase tracking-widest text-zinc-400">Puntos acordados</div>
             <h3 className="font-bold text-lg text-white">Acordamos tu Punto de Encuentro</h3>
             <p className="text-xs text-zinc-400 leading-relaxed font-light">
-              Luego de confirmada tu reserva, nos ponemos en contacto para acordar juntos el punto de encuentro ideal. Contamos con puntos clave de entrega y retiro distribuidos en: <strong className="text-[#FAFAF8]">Pinamar, Valeria del Mar, Mar de Ostende y Cariló</strong>.
+              Luego de confirmada tu reserva, nos ponemos en contacto para acordar juntos el punto de encuentro ideal. Contamos con puntos clave de entrega y retiro distribuidos en: <strong className="text-[#FAFAF8]">Pinamar, Valeria del Mar y Mar de Ostende</strong>.
             </p>
           </div>
         </div>
@@ -240,38 +235,30 @@ export default function LandingPage({ partner, onStartBooking }: LandingPageProp
               {/* Pinamar circuits and zones */}
               {/* Pinamar zone */}
               <g className="cursor-pointer" onClick={() => setSelectedZone("pinamar")}>
-                <rect x="100" y="20" width="180" height="70" rx="10" fill={selectedZone === "pinamar" ? "#FF5500" : "#222"} fillOpacity={selectedZone === "pinamar" ? "0.15" : "0.3"} stroke={selectedZone === "pinamar" ? "#FF5500" : "#444"} strokeWidth={selectedZone === "pinamar" ? "1.5" : "1"} />
-                <text x="190" y="50" fill={selectedZone === "pinamar" ? "#FFF" : "#AAA"} fontSize="12" fontWeight="bold" textAnchor="middle">PINAMAR</text>
-                <text x="190" y="65" fill={selectedZone === "pinamar" ? "#FF5500" : "#666"} fontSize="8" textAnchor="middle">Ciclovías Av. Bunge</text>
-                {selectedZone === "pinamar" && <circle cx="190" cy="30" r="4" fill="#FF5500" className="animate-ping" />}
+                <rect x="100" y="25" width="180" height="70" rx="10" fill={selectedZone === "pinamar" ? "#FF5500" : "#222"} fillOpacity={selectedZone === "pinamar" ? "0.15" : "0.3"} stroke={selectedZone === "pinamar" ? "#FF5500" : "#444"} strokeWidth={selectedZone === "pinamar" ? "1.5" : "1"} />
+                <text x="190" y="55" fill={selectedZone === "pinamar" ? "#FFF" : "#AAA"} fontSize="12" fontWeight="bold" textAnchor="middle">PINAMAR</text>
+                <text x="190" y="70" fill={selectedZone === "pinamar" ? "#FF5500" : "#666"} fontSize="8" textAnchor="middle">Ciclovías Av. Bunge</text>
+                {selectedZone === "pinamar" && <circle cx="190" cy="35" r="4" fill="#FF5500" className="animate-ping" />}
               </g>
 
               {/* Ostende zone */}
               <g className="cursor-pointer" onClick={() => setSelectedZone("ostende")}>
-                <rect x="100" y="100" width="180" height="50" rx="10" fill={selectedZone === "ostende" ? "#FF5500" : "#222"} fillOpacity={selectedZone === "ostende" ? "0.15" : "0.3"} stroke={selectedZone === "ostende" ? "#FF5500" : "#444"} strokeWidth={selectedZone === "ostende" ? "1.5" : "1"} />
-                <text x="190" y="125" fill={selectedZone === "ostende" ? "#FFF" : "#AAA"} fontSize="11" fontWeight="bold" textAnchor="middle">MAR DE OSTENDE</text>
-                <text x="190" y="138" fill={selectedZone === "ostende" ? "#FF5500" : "#666"} fontSize="8" textAnchor="middle">Zonas costeras tranquilas</text>
-                {selectedZone === "ostende" && <circle cx="190" cy="110" r="4" fill="#FF5500" className="animate-ping" />}
+                <rect x="100" y="115" width="180" height="60" rx="10" fill={selectedZone === "ostende" ? "#FF5500" : "#222"} fillOpacity={selectedZone === "ostende" ? "0.15" : "0.3"} stroke={selectedZone === "ostende" ? "#FF5500" : "#444"} strokeWidth={selectedZone === "ostende" ? "1.5" : "1"} />
+                <text x="190" y="142" fill={selectedZone === "ostende" ? "#FFF" : "#AAA"} fontSize="11" fontWeight="bold" textAnchor="middle">MAR DE OSTENDE</text>
+                <text x="190" y="157" fill={selectedZone === "ostende" ? "#FF5500" : "#666"} fontSize="8" textAnchor="middle">Zonas costeras tranquilas</text>
+                {selectedZone === "ostende" && <circle cx="190" cy="125" r="4" fill="#FF5500" className="animate-ping" />}
               </g>
 
               {/* Valeria zone */}
               <g className="cursor-pointer" onClick={() => setSelectedZone("valeria")}>
-                <rect x="100" y="160" width="180" height="50" rx="10" fill={selectedZone === "valeria" ? "#FF5500" : "#222"} fillOpacity={selectedZone === "valeria" ? "0.15" : "0.3"} stroke={selectedZone === "valeria" ? "#FF5500" : "#444"} strokeWidth={selectedZone === "valeria" ? "1.5" : "1"} />
-                <text x="190" y="185" fill={selectedZone === "valeria" ? "#FFF" : "#AAA"} fontSize="11" fontWeight="bold" textAnchor="middle">VALERIA DEL MAR</text>
-                <text x="190" y="198" fill={selectedZone === "valeria" ? "#FF5500" : "#666"} fontSize="8" textAnchor="middle">Arboledas y rotondas</text>
-                {selectedZone === "valeria" && <circle cx="190" cy="170" r="4" fill="#FF5500" className="animate-ping" />}
-              </g>
-
-              {/* Carilo zone */}
-              <g className="cursor-pointer" onClick={() => setSelectedZone("carilo")}>
-                <rect x="100" y="220" width="180" height="60" rx="10" fill={selectedZone === "carilo" ? "#FF5500" : "#222"} fillOpacity={selectedZone === "carilo" ? "0.15" : "0.3"} stroke={selectedZone === "carilo" ? "#FF5500" : "#444"} strokeWidth={selectedZone === "carilo" ? "1.5" : "1"} />
-                <text x="190" y="248" fill={selectedZone === "carilo" ? "#FFF" : "#AAA"} fontSize="12" fontWeight="bold" textAnchor="middle">CARILÓ</text>
-                <text x="190" y="262" fill={selectedZone === "carilo" ? "#FF5500" : "#666"} fontSize="8" textAnchor="middle">Senderos de bosque</text>
-                {selectedZone === "carilo" && <circle cx="190" cy="230" r="4" fill="#FF5500" className="animate-ping" />}
+                <rect x="100" y="195" width="180" height="60" rx="10" fill={selectedZone === "valeria" ? "#FF5500" : "#222"} fillOpacity={selectedZone === "valeria" ? "0.15" : "0.3"} stroke={selectedZone === "valeria" ? "#FF5500" : "#444"} strokeWidth={selectedZone === "valeria" ? "1.5" : "1"} />
+                <text x="190" y="222" fill={selectedZone === "valeria" ? "#FFF" : "#AAA"} fontSize="11" fontWeight="bold" textAnchor="middle">VALERIA DEL MAR</text>
+                <text x="190" y="237" fill={selectedZone === "valeria" ? "#FF5500" : "#666"} fontSize="8" textAnchor="middle">Arboledas y rotondas</text>
+                {selectedZone === "valeria" && <circle cx="190" cy="205" r="4" fill="#FF5500" className="animate-ping" />}
               </g>
 
               {/* Main connecting roads (Ciclovía) */}
-              <path d="M 190 90 L 190 100 M 190 150 L 190 160 M 190 210 L 190 220" stroke="#FF5500" strokeWidth="2" strokeDasharray="3 3" strokeOpacity="0.5" />
+              <path d="M 190 95 L 190 115 M 190 175 L 190 195" stroke="#FF5500" strokeWidth="2" strokeDasharray="3 3" strokeOpacity="0.5" />
             </svg>
             
             <span className="text-[10px] text-zinc-500 mt-2 font-mono">
@@ -339,7 +326,7 @@ export default function LandingPage({ partner, onStartBooking }: LandingPageProp
             <div className="space-y-1">
               <h4 className="text-xs font-bold text-white uppercase tracking-wider">Edad Mínima</h4>
               <p className="text-[11px] text-zinc-400 font-light leading-relaxed">
-                Debes tener <strong className="text-white">18 años o más</strong> con responsabilidad civil de conducción habilitada.
+                Debes tener <strong className="text-white">16 años o más</strong> con responsabilidad civil de conducción habilitada.
               </p>
             </div>
           </div>

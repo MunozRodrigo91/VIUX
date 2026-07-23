@@ -168,7 +168,7 @@ export default function App() {
             .select('*')
             .eq('fecha', today)
             .eq('estado', 'abierta')
-            .single();
+            .maybeSingle();
 
           const { data: reservaData, error: reservaError } = await supabase
             .from('reservas')
@@ -198,20 +198,25 @@ export default function App() {
             setCurrentReserva(reservaData as unknown as Reserva);
             setCurrentStep(5);
             setStartedBooking(true);
+
+            // Reemplazar los query params para limpiar la URL del navegador conservando ?reserva_confirmada=...
+            const cleanUrl = `${window.location.pathname}?reserva_confirmada=${mpExternalRef}`;
+            window.history.replaceState({}, document.title, cleanUrl);
+
             setNotification({
-              message: `¡Pago aprobado por MercadoPago! Se cobró la seña de $${reservaData.monto_sena?.toLocaleString("es-AR")} con éxito.`,
+              message: `¡Pago de seña recibido con éxito! Tu reserva #${mpExternalRef} está confirmada.`,
               type: "success"
             });
           }
         } catch (err) {
+          console.error("Error al procesar retorno exitoso de MercadoPago:", err);
           setNotification({
-            message: "El pago fue aprobado pero no pudimos cargar el ticket. Contactanos por WhatsApp.",
+            message: "El pago fue recibido pero hubo un problema al actualizar la pantalla. Tu reserva sigue activa.",
             type: "error"
           });
         }
       };
       handleMpSuccess();
-
     } else if (paymentStatus === "failure" && mpExternalRef) {
       posthog.capture('booking_payment_failed_mp', { reserva_id: mpExternalRef });
       setNotification({
@@ -588,8 +593,6 @@ export default function App() {
         <div className="max-w-4xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-3">
           <span>© 2026 VIUX - Alquiler de Monopatines</span>
           <div className="flex space-x-4">
-            <span className="hover:text-white transition-colors">Bunge & Playa</span>
-            <span>•</span>
             <span className="hover:text-white transition-colors">9:00 a 20:00 hs</span>
             <span>•</span>
             <span className="hover:text-white transition-colors">Pinamar, Argentina</span>

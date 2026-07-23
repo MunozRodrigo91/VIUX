@@ -1,6 +1,15 @@
 # VIUX — Memory del Proyecto
 > Última actualización: 2026-07-23
 
+## ⚠️ CAMBIO COMPLETADO: Ajuste de Zonas, Pie de Página y Edad Mínima (2026-07-23)
+- **Footer**: Eliminada la mención a `"Bunge & Playa"` en el pie de página de [`src/App.tsx`](file:///c:/Users/rodri/VIUX/src/App.tsx).
+- **Zonas y Recorridos**: Eliminada la zona de Cariló del mapa de recorridos, del selector de puntos de encuentro y de los textos informativos. Actualizadas las referencias de Ostende a **"Mar de Ostende"** en [`src/components/LandingPage.tsx`](file:///c:/Users/rodri/VIUX/src/components/LandingPage.tsx), [`src/components/PublicBooking.tsx`](file:///c:/Users/rodri/VIUX/src/components/PublicBooking.tsx), [`src/components/TicketView.tsx`](file:///c:/Users/rodri/VIUX/src/components/TicketView.tsx) y [`src/types.ts`](file:///c:/Users/rodri/VIUX/src/types.ts).
+- **Edad Mínima**: Modificada la edad mínima requerida de 18 a **16 años** en [`src/components/LandingPage.tsx`](file:///c:/Users/rodri/VIUX/src/components/LandingPage.tsx).
+
+## ⚠️ CAMBIO COMPLETADO: Filtro de Reservas Confirmadas y Redirección MercadoPago (2026-07-23)
+- **Filtro en AdminPanel**: En la pestaña de Reservas se muestran por defecto únicamente las reservas con **Seña Pagada (`seña_pagada`)**. Se incluyeron botones de acceso rápido para filtrar entre "✅ Con Seña", "⏳ Sin Abonar" y "Todas".
+- **Redirección PWA Post-Pago**: Al retornar desde MercadoPago con `payment=success`, `App.tsx` actualiza la reserva, registra la seña en la caja abierta y conmuta la pantalla al **Ticket Confirmado (Paso 5)**. Adicionalmente limpia la URL reemplazando los parámetros query a `?reserva_confirmada=res_XXXX` mediante `window.history.replaceState`.
+
 ## ⚠️ CAMBIO COMPLETADO: MercadoPago Sandbox → Producción (2026-07-23)
 - Se reemplazaron las credenciales de sandbox por las de producción en `.env`
 - Se eliminó el fallback hardcodeado del Access Token en la Edge Function `create-mp-preference`

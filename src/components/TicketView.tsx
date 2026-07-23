@@ -129,7 +129,7 @@ export default function TicketView({ reserva, onBackToStart }: TicketViewProps) 
                   : "Punto de encuentro a acordar juntos"}
               </div>
               <div className="text-[10.5px] text-zinc-400 mt-1 leading-relaxed font-light">
-                No tenemos un punto de encuentro fijo. Coordinaremos un punto óptimo en **Pinamar, Valeria del Mar, Mar de Ostende o Cariló** para la entrega.
+                No tenemos un punto de encuentro fijo. Coordinaremos un punto óptimo en **Pinamar, Valeria del Mar o Mar de Ostende** para la entrega.
               </div>
             </div>
           </div>

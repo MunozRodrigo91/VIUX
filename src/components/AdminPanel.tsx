@@ -47,6 +47,7 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
 
   // Active view
   const [activeTab, setActiveTab] = useState<"reservas" | "turnos" | "caja" | "partners" | "config" | "analytics">("reservas");
+  const [reservaPagoFilter, setReservaPagoFilter] = useState<"seña_pagada" | "pendiente" | "todas">("seña_pagada");
   const [partnerStats, setPartnerStats] = useState<PartnerStats[]>([]);
   const [allReservas, setAllReservas] = useState<Reserva[]>([]);
   const [loadingAnalytics, setLoadingAnalytics] = useState<boolean>(false);
@@ -853,7 +854,7 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
               {/* Top Summary Widgets */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="glass-card rounded-2xl p-4 text-center border border-white/10">
-                  <div className="text-[10px] uppercase tracking-wider text-zinc-400 font-bold">Reservas Hoy</div>
+                  <div className="text-[10px] uppercase tracking-wider text-zinc-400 font-bold">Reservas Totales</div>
                   <div className="text-lg font-mono font-bold text-white mt-1">{reservas.length}</div>
                 </div>
                 <div className="glass-card rounded-2xl p-4 text-center border border-white/10">
@@ -863,8 +864,8 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
                   </div>
                 </div>
                 <div className="glass-card rounded-2xl p-4 text-center border border-white/10">
-                  <div className="text-[10px] uppercase tracking-wider text-zinc-400 font-bold">Señas MP</div>
-                  <div className="text-lg font-mono font-bold text-white mt-1">
+                  <div className="text-[10px] uppercase tracking-wider text-zinc-400 font-bold">Señas Pagadas</div>
+                  <div className="text-lg font-mono font-bold text-emerald-400 mt-1">
                     {reservas.filter(r => r.estado_pago === "seña_pagada").length}
                   </div>
                 </div>
@@ -876,22 +877,77 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
                 </div>
               </div>
 
-              {/* Reservations Grid */}
-              {reservas.length === 0 ? (
-                <div className="glass-card rounded-2xl p-12 text-center text-sm text-zinc-400 border border-white/10">
-                  No hay reservas registradas para el {selectedFecha.split("-").reverse().join("/")}.
+              {/* Sub-filtro de Estado de Pago */}
+              <div className="flex items-center justify-between bg-black/40 p-1.5 rounded-xl border border-white/10">
+                <span className="text-[11px] font-bold text-zinc-400 px-2 uppercase tracking-wider hidden sm:inline">Mostrar:</span>
+                <div className="flex space-x-1.5 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => setReservaPagoFilter("seña_pagada")}
+                    className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      reservaPagoFilter === "seña_pagada"
+                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    ✅ Con Seña ({reservas.filter(r => r.estado_pago === "seña_pagada").length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReservaPagoFilter("pendiente")}
+                    className={`flex-1 sm:flex-none px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      reservaPagoFilter === "pendiente"
+                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    ⏳ Sin Abonar ({reservas.filter(r => r.estado_pago === "pendiente").length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReservaPagoFilter("todas")}
+                    className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      reservaPagoFilter === "todas"
+                        ? "bg-white/15 text-white border border-white/20 shadow-sm"
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    Todas ({reservas.length})
+                  </button>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {reservas.map((reserva) => {
-                    const isPending = reserva.estado_pago === "pendiente";
-                    const isCreated = reserva.estado_reserva === "creada";
-                    const isRenting = reserva.estado_reserva === "check_in";
-                    const isReturned = reserva.estado_reserva === "check_out";
-                    const isNoShow = reserva.estado_reserva === "no_show";
+              </div>
 
-                    return (
-                      <div 
+              {/* Filtered Reservations Grid */}
+              {(() => {
+                const filteredReservas = reservas.filter(r => {
+                  if (reservaPagoFilter === "seña_pagada") return r.estado_pago === "seña_pagada";
+                  if (reservaPagoFilter === "pendiente") return r.estado_pago === "pendiente";
+                  return true;
+                });
+
+                if (filteredReservas.length === 0) {
+                  return (
+                    <div className="glass-card rounded-2xl p-12 text-center text-sm text-zinc-400 border border-white/10">
+                      {reservaPagoFilter === "seña_pagada"
+                        ? `No hay reservas con seña pagada para el ${selectedFecha.split("-").reverse().join("/")}.`
+                        : reservaPagoFilter === "pendiente"
+                          ? `No hay reservas sin abonar para el ${selectedFecha.split("-").reverse().join("/")}.`
+                          : `No hay reservas registradas para el ${selectedFecha.split("-").reverse().join("/")}.`}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-3">
+                    {filteredReservas.map((reserva) => {
+                      const isPending = reserva.estado_pago === "pendiente";
+                      const isCreated = reserva.estado_reserva === "creada";
+                      const isRenting = reserva.estado_reserva === "check_in";
+                      const isReturned = reserva.estado_reserva === "check_out";
+                      const isNoShow = reserva.estado_reserva === "no_show";
+
+                      return (
+                        <div 
                         key={reserva.id}
                         className={`glass-card border rounded-2xl p-5 transition-all ${
                           isRenting 
@@ -1058,8 +1114,9 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
                       </div>
                     );
                   })}
-                </div>
-              )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 

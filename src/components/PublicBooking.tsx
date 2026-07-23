@@ -40,7 +40,7 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
   const [email, setEmail] = useState<string>("");
   const [deliveryMode, setDeliveryMode] = useState<"meeting_point" | "hotel_delivery">("meeting_point");
   const [nombreHotel, setNombreHotel] = useState<string>("");
-  const [puntoEncuentroZona, setPuntoEncuentroZona] = useState<"Pinamar" | "Mar de Ostende" | "Valeria del mar" | "Carilo">("Pinamar");
+  const [puntoEncuentroZona, setPuntoEncuentroZona] = useState<"Pinamar" | "Mar de Ostende" | "Valeria del mar">("Pinamar");
   
   const [loadingBooking, setLoadingBooking] = useState<boolean>(false);
   const [bookingError, setBookingError] = useState<string>("");
@@ -727,7 +727,7 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
                   >
                     <span className="font-bold text-xs text-white">Acordamos tu Punto de Encuentro (Flexible)</span>
                     <span className="text-[10px] text-zinc-400 mt-1 leading-relaxed font-light">
-                      No tenemos punto fijo. Coordinamos juntos después de confirmada la reserva en Pinamar, Valeria del Mar, Ostende o Cariló.
+                      No tenemos punto fijo. Coordinamos juntos después de confirmada la reserva en Pinamar, Valeria del Mar o Mar de Ostende.
                     </span>
                   </button>
                   
@@ -764,7 +764,6 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
                         <option value="Pinamar" className="bg-zinc-950">Pinamar</option>
                         <option value="Mar de Ostende" className="bg-zinc-950">Mar de Ostende</option>
                         <option value="Valeria del mar" className="bg-zinc-950">Valeria del mar</option>
-                        <option value="Carilo" className="bg-zinc-950">Cariló</option>
                       </select>
                       <span className="text-[9px] text-zinc-500 block leading-relaxed">
                         📍 Nos encontraremos en la zona seleccionada. Coordinaremos la ubicación exacta por WhatsApp.
