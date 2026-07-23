@@ -507,7 +507,7 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
             ) : (() => {
               const now = new Date();
               const nowHHMM = now.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
-              const isToday = fecha === now.toISOString().split("T")[0];
+              const isToday = fecha === getFormattedDate(0);
               const turnosVisibles = turnos.filter(t => {
                 if (t.habilitado === false) return false;
                 if (isToday && t.hora <= nowHHMM) return false;
