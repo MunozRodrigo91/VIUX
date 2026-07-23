@@ -14,8 +14,8 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    // Leer desde variable de entorno; el fallback es el token de prueba de Mercado Pago
-    const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN") || "APP_USR-1320888435937283-072211-b778225133cac684f599d73ed9550c6f-3560382516";
+    // Leer desde variable de entorno — sin fallback, DEBE estar configurado en producción
+    const mpAccessToken = Deno.env.get("MP_ACCESS_TOKEN") || "";
     let appUrl = Deno.env.get("APP_URL") || "";
     if (appUrl.trim() === "") {
       appUrl = "http://localhost:3000";
@@ -24,6 +24,13 @@ serve(async (req) => {
     if (!supabaseUrl || !supabaseServiceKey) {
       return new Response(
         JSON.stringify({ error: "Faltan variables de entorno de Supabase." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!mpAccessToken) {
+      return new Response(
+        JSON.stringify({ error: "MP_ACCESS_TOKEN no configurado en las variables de entorno." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -118,7 +125,6 @@ serve(async (req) => {
         success: true,
         preference_id: mpData.id,
         init_point: mpData.init_point,
-        sandbox_init_point: mpData.sandbox_init_point,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

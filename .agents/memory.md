@@ -1,5 +1,14 @@
 # VIUX — Memory del Proyecto
-> Última actualización: 2026-07-22
+> Última actualización: 2026-07-23
+
+## ⚠️ CAMBIO COMPLETADO: MercadoPago Sandbox → Producción (2026-07-23)
+- Se reemplazaron las credenciales de sandbox por las de producción en `.env`
+- Se eliminó el fallback hardcodeado del Access Token en la Edge Function `create-mp-preference`
+- Se agregó validación explícita si `MP_ACCESS_TOKEN` no está configurado
+- Se removió `sandbox_init_point` del response de la Edge Function
+- Se actualizó `APP_URL` a `https://viux.ar` (producción)
+- Se actualizó `.env.example` con placeholders de MercadoPago
+- **PENDIENTE**: Configurar las variables en el hosting (Netlify + Supabase Edge Functions)
 
 ## ⚠️ BUG CONOCIDO RESUELTO: Error en selección de fechas (2026-07-23)
 - El uso de `new Date().toISOString()` generaba fechas en UTC. En horario de Argentina (después de las 21hs), generaba el día siguiente, causando que los turnos del día siguiente fueran tratados como "hoy" y se ocultaran.
@@ -30,7 +39,7 @@
 | Backend | Prescindido (Supabase SDK directo en frontend) | ✅ ELIMINADO / DIRECTO |
 | Persistencia | Supabase PostgreSQL Remoto | ✅ ACTIVO |
 | Realtime | Supabase Realtime Channels (Postgres changes) | ✅ ACTIVO |
-| Pagos | MercadoPago Checkout Pro **REAL** (Edge Function + SDK) | ✅ INTEGRADO |
+| Pagos | MercadoPago Checkout Pro **PRODUCCIÓN** (Edge Function + SDK) | ✅ PRODUCCIÓN |
 | PWA | manifest.json + sw.js | ✅ CONFIGURADO (faltan iconos) |
 | DB Supabase | PostgreSQL / RLS y roles configurados | ✅ COMPLETO |
 | Auth Admin | Integrado con auth.users + profiles | ✅ COMPLETO |
@@ -77,6 +86,9 @@
 - [x] Crear proyecto en Supabase
 - [x] Ejecutar script SQL del MIGRATION.md (5 tablas)
 - [x] **(IMPORTANTE) Ejecutar `MIGRATION_UPDATES.sql` en Supabase para habilitar selección de duración**
+- [x] MercadoPago → modo PRODUCCIÓN (credenciales + Edge Function)
+- [ ] **Configurar variables de entorno en Supabase Edge Functions** (`MP_ACCESS_TOKEN`, `APP_URL`)
+- [ ] **Configurar variable de entorno en Netlify** (`VITE_MP_PUBLIC_KEY`)
 - [ ] Agregar iconos PWA (icon-192.png y icon-512.png)
 
 ---
