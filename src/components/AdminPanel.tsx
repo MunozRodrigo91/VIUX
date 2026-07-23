@@ -10,8 +10,17 @@ interface AdminPanelProps {
   onLogout?: () => void;
 }
 
+const getLocalDateString = (offset = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPanelProps) {
-  const [selectedFecha, setSelectedFecha] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [selectedFecha, setSelectedFecha] = useState<string>(getLocalDateString(0));
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -44,7 +53,6 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
 
   // Turno creation form
   const [newTurnoHora, setNewTurnoHora] = useState<string>("09:00");
-  const [newTurnoDuracion, setNewTurnoDuracion] = useState<1 | 2 | null>(1);
   const [newTurnoCapacidad, setNewTurnoCapacidad] = useState<number>(4);
   const [creatingTurno, setCreatingTurno] = useState<boolean>(false);
 
@@ -202,15 +210,7 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
   };
 
   const handleUpdateTurnoDuracion = async (turnoId: string, duracion: 1 | 2 | null) => {
-    try {
-      await supabase
-        .from('turnos')
-        .update({ duracion_horas: duracion })
-        .eq('id', turnoId);
-      fetchData(false);
-    } catch (e) {
-      console.error(e);
-    }
+    // Deprecated for turnos, duration is now selected by customer per reserva.
   };
 
   const handleCreateTurno = async (e: React.FormEvent) => {
@@ -230,8 +230,7 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
         hora: newTurnoHora,
         total_unidades: newTurnoCapacidad,
         unidades_disponibles: newTurnoCapacidad,
-        habilitado: true,
-        duracion_horas: newTurnoDuracion
+        habilitado: true
       });
       if (error) throw error;
       fetchData(false);
@@ -271,8 +270,7 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
         hora,
         total_unidades: newTurnoCapacidad,
         unidades_disponibles: newTurnoCapacidad,
-        habilitado: true,
-        duracion_horas: newTurnoDuracion
+        habilitado: true
       }));
       const { error } = await supabase.from('turnos').insert(inserts);
       if (error) throw error;
@@ -1092,26 +1090,7 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
                     </select>
                   </div>
 
-                  {/* Duracion */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">Duración</label>
-                    <div className="flex gap-1.5 h-11">
-                      {([1, 2, null] as (1 | 2 | null)[]).map(dur => (
-                        <button
-                          key={String(dur)}
-                          type="button"
-                          onClick={() => setNewTurnoDuracion(dur)}
-                          className={`flex-1 text-[11px] font-bold rounded-xl border transition-all cursor-pointer ${
-                            newTurnoDuracion === dur
-                              ? 'bg-[#FF5500] border-[#FF5500] text-white shadow-[0_0_8px_rgba(255,85,0,0.35)]'
-                              : 'bg-black/40 border-white/10 text-zinc-400 hover:bg-zinc-800 hover:text-white'
-                          }`}
-                        >
-                          {dur === 1 ? '1 h' : dur === 2 ? '2 h' : 'Día'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                  {/* Removed duration selector from form */}
 
                   {/* Monopatines */}
                   <div className="space-y-1.5">
@@ -1184,11 +1163,10 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
                       .slice()
                       .sort((a, b) => a.hora.localeCompare(b.hora))
                       .map((turno) => {
-                      const isToday = turno.fecha === new Date().toISOString().split('T')[0];
+                      const isToday = turno.fecha === getLocalDateString(0);
                       const nowHHMM = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
                       const isPast = isToday && turno.hora < nowHHMM;
                       const isEnabled = turno.habilitado !== false;
-                      const durLabel = turno.duracion_horas === 2 ? '2 h' : turno.duracion_horas === null ? 'Día' : '1 h';
 
                       return (
                         <div
@@ -1231,12 +1209,8 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
                             </div>
                           </div>
 
-                          {/* Row 2: Duracion badge + toggle */}
-                          <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                            <div className="flex items-center gap-1.5 text-[10px] text-zinc-400">
-                              <Timer className="w-3 h-3 text-[#FF5500] shrink-0" />
-                              <span className="text-white font-bold">{durLabel}</span>
-                            </div>
+                          {/* Row 2: Enable toggle */}
+                          <div className="flex items-center justify-end pt-2 border-t border-white/5">
                             <button
                               onClick={() => handleToggleTurno(turno.id, isEnabled)}
                               disabled={isPast}
@@ -1250,26 +1224,6 @@ export default function AdminPanel({ config, onUpdateConfig, onLogout }: AdminPa
                             >
                               {isEnabled ? <><ToggleRight className="w-4 h-4" /><span>ON</span></> : <><ToggleLeft className="w-4 h-4" /><span>OFF</span></>}
                             </button>
-                          </div>
-
-                          {/* Row 3: Duration selector */}
-                          <div className="space-y-1">
-                            <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider block">Duración:</span>
-                            <div className="flex gap-1.5">
-                              {([1, 2, null] as (1 | 2 | null)[]).map(dur => (
-                                <button
-                                  key={String(dur)}
-                                  onClick={() => handleUpdateTurnoDuracion(turno.id, dur)}
-                                  className={`flex-1 h-7 text-[10px] font-bold rounded-lg border transition-all cursor-pointer ${
-                                    turno.duracion_horas === dur
-                                      ? 'bg-[#FF5500] border-[#FF5500] text-white shadow-[0_0_6px_rgba(255,85,0,0.3)]'
-                                      : 'bg-black/40 border-white/10 text-zinc-400 hover:bg-zinc-800 hover:text-white'
-                                  }`}
-                                >
-                                  {dur === 1 ? '1 h' : dur === 2 ? '2 h' : 'Día'}
-                                </button>
-                              ))}
-                            </div>
                           </div>
 
                           {/* Row 4: Capacity selector */}

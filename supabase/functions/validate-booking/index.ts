@@ -44,7 +44,8 @@ serve(async (req) => {
       nombre_hotel,
       punto_encuentro_zona,
       partner,
-      source // Parámetro opcional para integraciones futuras
+      source, // Parámetro opcional para integraciones futuras
+      duracion_horas
     } = body;
 
     // Validación básica de campos obligatorios
@@ -71,7 +72,8 @@ serve(async (req) => {
       p_nombre_hotel: nombre_hotel || null,
       p_punto_encuentro_zona: punto_encuentro_zona || null,
       p_partner: partner || null,
-      p_source: source || "PWA-Local"
+      p_source: source || "PWA-Local",
+      p_duracion_horas: duracion_horas
     });
 
     if (dbError) {

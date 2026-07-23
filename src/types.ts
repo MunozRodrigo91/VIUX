@@ -17,7 +17,6 @@ export interface Turno {
   total_unidades: number; // e.g. 4
   unidades_disponibles: number; // computed as total_unidades - sum of quantity of active reservations
   habilitado: boolean; // if false, hidden from public booking
-  duracion_horas: DuracionTurno; // 1, 2, or null (full day)
 }
 
 export type EstadoPago = 'pendiente' | 'seña_pagada' | 'reembolsado';
@@ -45,6 +44,7 @@ export interface Reserva {
   nombre_hotel?: string;
   punto_encuentro_zona?: 'Pinamar' | 'Mar de Ostende' | 'Valeria del mar' | 'Carilo';
   mp_preference_id?: string;
+  duracion_horas: DuracionTurno; // Chosen by customer: 1, 2, or null
   created_at: string;
 }
 

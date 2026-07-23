@@ -1,6 +1,10 @@
 # VIUX — Memory del Proyecto
 > Última actualización: 2026-07-22
 
+## ⚠️ BUG CONOCIDO RESUELTO: Error en selección de fechas (2026-07-23)
+- El uso de `new Date().toISOString()` generaba fechas en UTC. En horario de Argentina (después de las 21hs), generaba el día siguiente, causando que los turnos del día siguiente fueran tratados como "hoy" y se ocultaran.
+- Solución: Se implementó `getLocalDateString()` en `AdminPanel` y `PublicBooking` para tomar la fecha según la zona horaria del cliente.
+
 ## ⚠️ BUG CONOCIDO RESUELTO: Recursión infinita en RLS de `profiles`
 - La política `"Admin total sobre perfiles"` consultaba `profiles` para verificar si el usuario era admin → loop infinito
 - Solución: reemplazada por `(auth.jwt() -> 'app_metadata' ->> 'role') = 'admin'`
@@ -11,11 +15,6 @@
 - Esto causaba: panel admin en negro + crash en TicketView + datos undefined en el flujo de pago
 - Solución: `types.ts` actualizado → `monto_sena` es el campo principal, `monto_seña` queda como alias opcional (legacy para server.ts)
 - Archivos corregidos: `types.ts`, `App.tsx`, `AdminPanel.tsx`, `PublicBooking.tsx`, `TicketView.tsx`, `server.ts`
-
-## ⚠️ BUG CONOCIDO RESUELTO: MercadoPago rechaza "auto_return" en local (2026-07-22)
-- MP tiraba 400 (`auto_return invalid. back_url.success must be defined`) cuando la URL de retorno era HTTP (`http://localhost`).
-- MP requiere estrictamente HTTPS para procesar el auto_return, de lo contrario ignora completamente las `back_urls`.
-- Solución: Se actualizó la Edge Function `create-mp-preference` para enviar `auto_return: "approved"` **solo si** la `APP_URL` comienza con `https`.
 
 ## ⚠️ BUG CONOCIDO RESUELTO: validate-booking no estaba deployada en Supabase (2026-07-22)
 - La Edge Function existía localmente pero nunca fue subida → 404 al intentar reservar
@@ -52,39 +51,6 @@
 
 ---
 
-## API Endpoints del server.ts
-
-| Método | Ruta | Función |
-|---|---|---|
-| GET | `/api/config` | Obtener configuración |
-| POST | `/api/config` | Actualizar configuración |
-| GET | `/api/turnos` | Listar turnos (con auto-generación por fecha) |
-| POST | `/api/turnos/set-capacity` | Ajustar capacidad de un turno |
-| POST | `/api/reservas` | Crear nueva reserva |
-| GET | `/api/reservas` | Listar reservas (con filtro por fecha) |
-| GET | `/api/reservas/:id` | Ver reserva individual |
-| POST | `/api/reservas/:id/checkin` | Check-in (cobra saldo + garantía) |
-| POST | `/api/reservas/:id/checkout` | Check-out (devuelve garantía) |
-| POST | `/api/reservas/:id/no-show` | Marcar no-show |
-| GET | `/api/caja` | Estado de caja de una fecha |
-| POST | `/api/caja/abrir` | Abrir caja del día |
-| POST | `/api/caja/cerrar` | Cerrar caja del día |
-| POST | `/api/caja/ingreso` | Ingreso manual |
-| POST | `/api/caja/gasto` | Gasto manual |
-| GET | `/api/events` | SSE stream de actualizaciones |
-| GET/POST | `/api/mercadopago/*` | Webhook/simulación de pagos (legacy) |
-
----
-
-## Edge Functions Supabase
-
-| Función | Descripción | Estado |
-|---|---|---|
-| `validate-booking` | Crea reserva atómicamente en DB | ✅ ACTIVA (deployada 2026-07-22) |
-| `create-mp-preference` | Genera preferencia real MP Checkout Pro (30% seña) | ✅ ACTIVA |
-
----
-
 ## Reglas de Negocio Implementadas
 - [x] Reserva bloquea stock por 10 min hasta pago de seña
 - [x] Seña = 30% del total (configurable)
@@ -94,20 +60,14 @@
 - [x] Check-In requiere caja ABIERTA
 - [x] Estados de reserva: creada → seña_pagada → check_in → check_out / no_show
 - [x] Turnos de 09:00 a 19:00 con auto-generación por fecha
-- [x] **Gestión avanzada de turnos en Panel de Operación (2026-07-21)**:
-    - Toggle habilitar/inhabilitar horario (campo `habilitado BOOLEAN` en tabla `turnos`)
-    - Selector de duración por turno: 1h / 2h / Día completo (campo `duracion_horas INTEGER NULL`)
-    - Turnos inhabilitados NO se muestran al cliente
-    - Horarios pasados (hora < hora actual, mismo día) NO se muestran al cliente
-    - Precios diferenciados por duración: `precio_2_horas` y `precio_dia_completo` en tabla `config`
-    - Panel de Ajustes muestra los 3 precios editables: 1h, 2h, Día completo
-    - Seleccionar 0 monopatines inhabilita el turno automáticamente
-- [x] **CRUD completo de turnos en Panel de Operación (2026-07-21)**:
-    - Formulario para crear turnos: hora (select 08:00-20:00), duración (1h/2h/Día), monopatines (1-4)
-    - Validación anti-duplicado (misma fecha + misma hora)
-    - Botón "Generar día completo": crea en un click los turnos de 09:00 a 19:00 faltantes
-    - Botón de eliminación individual por turno (con confirmación)
-    - Lista de turnos ordenada por hora con edición inline de duración, capacidad y visibilidad
+- [x] **Selección Dinámica de Duración (2026-07-23)**:
+    - Cliente elige duración en `PublicBooking` (1 hora, 2 horas, Día completo)
+    - Precios calculados dinámicamente: `precio_por_hora`, `precio_2_horas`, `precio_dia_completo`
+    - Bloqueo en DB real: Si cliente elige > 1 hora, se bloquea el stock correspondiente en los turnos subsecuentes.
+    - Script SQL proporcionado `MIGRATION_UPDATES.sql` para alterar `reservas` y recrear `atomic_reserve`.
+- [x] **CRUD completo de turnos en Panel de Operación**:
+    - Formulario para crear turnos: hora, monopatines.
+    - Validación anti-duplicado y generación masiva.
 
 ---
 
@@ -116,30 +76,13 @@
 ### Tareas Pendientes
 - [x] Crear proyecto en Supabase
 - [x] Ejecutar script SQL del MIGRATION.md (5 tablas)
-- [x] Seed de datos desde mockdata.json
-- [x] Reemplazar fetch("/api/*") por Supabase Client SDK
-- [x] Migrar webhook MercadoPago a Supabase Edge Function (validate-booking y simulación listas)
-- [x] Reemplazar SSE por Supabase Realtime
-- [x] Implementar RLS (Row Level Security) para admin
-- [x] Quitar demo credentials de UI y crear Admin User seguro en auth.users
+- [x] **(IMPORTANTE) Ejecutar `MIGRATION_UPDATES.sql` en Supabase para habilitar selección de duración**
 - [ ] Agregar iconos PWA (icon-192.png y icon-512.png)
-- [x] Deploy en producción (Vercel / Netlify + Supabase)
-- [x] **Integración MercadoPago Checkout Pro REAL (2026-07-22)**:
-    - Nueva Edge Function `create-mp-preference` deployada en Supabase
-    - Secrets `MP_ACCESS_TOKEN` y `APP_URL` configurados en Supabase
-    - SDK oficial de MP cargado desde CDN en `index.html`
-    - Step 4 del flujo de reserva usa SDK real con botón MP oficial
-    - back_urls configuradas: `?payment=success/failure/pending&external_reference=reserva_id`
-    - `App.tsx` maneja las 3 back_urls de retorno y actualiza estado en Supabase
-    - Botón de aprobación directa conservado para demos internas
 
 ---
 
 ## Archivos Clave
 - `DOCUMENTACION.md` — descripción completa del dominio y reglas de negocio
 - `MIGRATION.md` — guía paso a paso para Supabase + PWA
-- `data.json` — base de datos local activa (9KB)
-- `mockdata.json` — datos semilla para Supabase (8.5KB)
+- `MIGRATION_UPDATES.sql` — Actualización de DB para duraciones dinámicas
 - `server.ts` — backend Express completo (1065 líneas / 35KB)
-- `netlify.toml` — configuración de redirecciones y build de Netlify
-

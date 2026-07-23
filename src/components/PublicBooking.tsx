@@ -19,7 +19,10 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
   const getFormattedDate = (offset = 0) => {
     const d = new Date();
     d.setDate(d.getDate() + offset);
-    return d.toISOString().split("T")[0];
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   const todayStr = getFormattedDate(0);
@@ -28,6 +31,7 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
   const [fecha, setFecha] = useState<string>(todayStr);
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [selectedTurnoId, setSelectedTurnoId] = useState<string>("");
+  const [duracionSeleccionada, setDuracionSeleccionada] = useState<1 | 2 | null>(1);
   const [loadingTurnos, setLoadingTurnos] = useState<boolean>(false);
   
   const [nombre, setNombre] = useState<string>("");
@@ -144,10 +148,8 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
   };
 
   const precioUnitario = (() => {
-    const selectedTurno = turnos.find(t => t.id === selectedTurnoId);
-    if (!selectedTurno) return config.precioPorHora;
-    if (selectedTurno.duracion_horas === 2) return config.precio2Horas;
-    if (selectedTurno.duracion_horas === null) return config.precioDiaCompleto;
+    if (duracionSeleccionada === 2) return config.precio2Horas;
+    if (duracionSeleccionada === null) return config.precioDiaCompleto;
     return config.precioPorHora;
   })();
 
@@ -222,7 +224,8 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
           nombre_hotel: deliveryMode === "hotel_delivery" ? nombreHotel : null,
           punto_encuentro_zona: deliveryMode === "meeting_point" ? puntoEncuentroZona : null,
           partner: partner || null,
-          source: "PWA-Local"
+          source: "PWA-Local",
+          duracion_horas: duracionSeleccionada
         }
       });
 
@@ -522,13 +525,6 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
                   {turnosVisibles.map((turno) => {
                     const fitsDemand = turno.unidades_disponibles >= cantidad;
                     const isSelected = selectedTurnoId === turno.id;
-                    const durLabel = turno.duracion_horas === 2 ? "2 horas" : turno.duracion_horas === null ? "Día completo" : "1 hora";
-                    const precioEste = turno.duracion_horas === 2
-                      ? config.precio2Horas
-                      : turno.duracion_horas === null
-                        ? config.precioDiaCompleto
-                        : config.precioPorHora;
-
                     return (
                       <button
                         key={turno.id}
@@ -546,7 +542,7 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
                         <div>
                           <div className="text-sm font-bold text-white font-display">{turno.hora} hs</div>
                           <div className="text-[10px] text-zinc-400 mt-0.5">
-                            Duración: {durLabel} &nbsp;&middot;&nbsp; ${precioEste.toLocaleString("es-AR")} / monopatín
+                            Seleccioná para ver opciones de alquiler
                           </div>
                         </div>
 
@@ -577,13 +573,42 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
             })()}
 
             {selectedTurnoId && (
-              <button
-                onClick={() => setStep(3)}
-                className="w-full h-12 bg-[#FF5500] hover:bg-[#ff6e1a] text-white rounded-lg font-bold flex items-center justify-center space-x-2 active:scale-[0.99] transition-all cursor-pointer text-sm shadow-lg shadow-[#FF5500]/10 uppercase tracking-wider"
-              >
-                <span>Continuar con tus datos</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              <div className="space-y-4 pt-2">
+                <div className="glass-card rounded-xl p-5 space-y-4 border border-white/10">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-300 block">
+                    3. ¿Por cuánto tiempo?
+                  </label>
+                  <div className="flex gap-2">
+                    {[
+                      { val: 1, label: "1 Hora", price: config.precioPorHora },
+                      { val: 2, label: "2 Horas", price: config.precio2Horas },
+                      { val: null, label: "Día Completo", price: config.precioDiaCompleto }
+                    ].map(opt => (
+                      <button
+                        key={String(opt.val)}
+                        type="button"
+                        onClick={() => setDuracionSeleccionada(opt.val as any)}
+                        className={`flex-1 p-3 rounded-lg border transition-all cursor-pointer text-center ${
+                          duracionSeleccionada === opt.val
+                            ? "border-[#FF5500] bg-[#FF5500]/15 text-white shadow-[0_0_12px_rgba(255,85,0,0.15)]"
+                            : "border-white/10 bg-black/20 text-zinc-400 hover:bg-white/5"
+                        }`}
+                      >
+                        <div className="text-xs font-bold font-display">{opt.label}</div>
+                        <div className="text-[10px] text-[#FF5500] mt-1 font-mono">${opt.price.toLocaleString("es-AR")} c/u</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setStep(3)}
+                  className="w-full h-12 bg-[#FF5500] hover:bg-[#ff6e1a] text-white rounded-lg font-bold flex items-center justify-center space-x-2 active:scale-[0.99] transition-all cursor-pointer text-sm shadow-lg shadow-[#FF5500]/10 uppercase tracking-wider"
+                >
+                  <span>Continuar con tus datos</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
             )}
           </motion.div>
         )}
@@ -774,7 +799,7 @@ export default function PublicBooking({ partner, onBookingSuccess, config, onSte
                 
                 <div className="flex justify-between text-xs text-zinc-400">
                   <span>
-                    {cantidad} monopatín(es) x 1 hora:
+                    {cantidad} monopatín(es) x {duracionSeleccionada === 2 ? "2 horas" : duracionSeleccionada === null ? "Día completo" : "1 hora"}:
                   </span>
                   <span className="font-mono text-white font-semibold">
                     ${totalAlquiler.toLocaleString("es-AR")}
