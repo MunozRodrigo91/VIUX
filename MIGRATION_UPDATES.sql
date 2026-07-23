@@ -57,14 +57,14 @@ BEGIN
             END IF;
         END LOOP;
     ELSIF p_duracion_horas > 1 THEN
-        v_hora_int := cast(split_part(v_turno.hora, ':', 1) as integer);
+        v_hora_int := cast(split_part(v_turno.hora::text, ':', 1) as integer);
         FOR v_i IN 1 .. (p_duracion_horas - 1) LOOP
             DECLARE
-                v_next_hora text := lpad(cast(v_hora_int + v_i as text), 2, '0') || ':00';
+                v_next_hora text := lpad(cast(v_hora_int + v_i as text), 2, '0') || ':00:00';
             BEGIN
                 SELECT * INTO v_next_turno
                 FROM public.turnos
-                WHERE fecha = v_turno.fecha AND hora = v_next_hora
+                WHERE fecha = v_turno.fecha AND hora = v_next_hora::time
                 FOR UPDATE;
 
                 IF NOT FOUND THEN
@@ -89,14 +89,14 @@ BEGIN
         SET unidades_disponibles = unidades_disponibles - p_cantidad
         WHERE fecha = v_turno.fecha AND hora > v_turno.hora;
     ELSIF p_duracion_horas > 1 THEN
-        v_hora_int := cast(split_part(v_turno.hora, ':', 1) as integer);
+        v_hora_int := cast(split_part(v_turno.hora::text, ':', 1) as integer);
         FOR v_i IN 1 .. (p_duracion_horas - 1) LOOP
             DECLARE
-                v_next_hora text := lpad(cast(v_hora_int + v_i as text), 2, '0') || ':00';
+                v_next_hora text := lpad(cast(v_hora_int + v_i as text), 2, '0') || ':00:00';
             BEGIN
                 UPDATE public.turnos
                 SET unidades_disponibles = unidades_disponibles - p_cantidad
-                WHERE fecha = v_turno.fecha AND hora = v_next_hora;
+                WHERE fecha = v_turno.fecha AND hora = v_next_hora::time;
             END;
         END LOOP;
     END IF;
@@ -110,10 +110,10 @@ BEGIN
         monto_sena, monto_saldo, monto_garantia, partner, delivery_mode,
         nombre_hotel, punto_encuentro_zona, duracion_horas, estado_pago, estado_reserva
     ) VALUES (
-        v_reserva_id, p_turno_id, v_turno.fecha, v_turno.hora, p_nombre, p_dni,
-        p_telefono, p_email, p_cantidad, p_monto_total,
-        p_monto_sena, p_monto_saldo, p_monto_garantia, p_partner, p_delivery_mode,
-        p_nombre_hotel, p_punto_encuentro_zona, p_duracion_horas, 'pendiente', 'creada'
+        v_reserva_id, p_turno_id, v_turno.fecha, v_turno.hora::time, p_nombre, p_dni,
+        p_telefono, p_email, p_cantidad::smallint, p_monto_total,
+        p_monto_sena, p_monto_saldo, p_monto_garantia, p_partner, p_delivery_mode::delivery_mode,
+        p_nombre_hotel, p_punto_encuentro_zona::zona_encuentro, p_duracion_horas, 'pendiente'::estado_pago, 'creada'::estado_reserva
     );
 
     RETURN jsonb_build_object('success', true, 'reserva_id', v_reserva_id, 'source', p_source);
